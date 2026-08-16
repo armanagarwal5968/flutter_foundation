@@ -1,8 +1,9 @@
 /// Shared, app-agnostic foundation APIs for Alramwarnaga Flutter projects.
 library;
 
-// Export public services, wrappers, and layers from this library as they are
-// introduced. Implementation details should remain under lib/src.
+export 'src/auth/auth_user.dart';
+export 'src/auth/authentication_service.dart';
+export 'src/auth/google_authentication_service.dart';
 
 /// Metadata for the shared foundation package.
 abstract final class AlramwarnagaFoundation {
