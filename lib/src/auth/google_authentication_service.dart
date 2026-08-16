@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import 'auth_user.dart';
-import 'account_role.dart';
+import 'account_roles.dart';
 import 'authentication_service.dart';
 
 /// Firebase Authentication backed by Google Sign-In.
@@ -95,7 +95,7 @@ class GoogleAuthenticationService implements AuthenticationService {
     return AuthUser(
       id: user.uid,
       email: user.email,
-      role: AccountRole.fromClaim(token.claims?['role']),
+      roles: parseAccountRoles(token.claims),
       displayName: user.displayName,
       photoUrl: user.photoURL,
     );
