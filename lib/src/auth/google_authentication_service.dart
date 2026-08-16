@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import 'auth_user.dart';
+import 'account_role.dart';
 import 'authentication_service.dart';
 
 /// Firebase Authentication backed by Google Sign-In.
@@ -24,22 +25,27 @@ class GoogleAuthenticationService implements AuthenticationService {
   final String? serverClientId;
 
   static Future<void>? _nativeInitialization;
+  AuthUser? _currentUser;
 
   @override
-  AuthUser? get currentUser => _mapUser(_firebaseAuth.currentUser);
+  AuthUser? get currentUser => _currentUser;
 
   @override
-  Stream<AuthUser?> get authStateChanges =>
-      _firebaseAuth.authStateChanges().map(_mapUser);
+  Stream<AuthUser?> get authStateChanges => _firebaseAuth
+      .idTokenChanges()
+      .asyncMap(_mapUser)
+      .map((user) => _currentUser = user);
 
   @override
   Future<void> initialize() async {
-    if (kIsWeb) return;
-    _nativeInitialization ??= _googleSignIn.initialize(
-      clientId: clientId,
-      serverClientId: serverClientId,
-    );
-    await _nativeInitialization;
+    _currentUser = await _mapUser(_firebaseAuth.currentUser);
+    if (!kIsWeb) {
+      _nativeInitialization ??= _googleSignIn.initialize(
+        clientId: clientId,
+        serverClientId: serverClientId,
+      );
+      await _nativeInitialization;
+    }
   }
 
   @override
@@ -66,12 +72,13 @@ class GoogleAuthenticationService implements AuthenticationService {
       );
     }
 
-    return _mapUser(credential.user);
+    return _currentUser = await _mapUser(credential.user);
   }
 
   @override
   Future<void> signOut() async {
     await _firebaseAuth.signOut();
+    _currentUser = null;
     if (!kIsWeb) {
       await initialize();
       await _googleSignIn.signOut();
@@ -82,11 +89,13 @@ class GoogleAuthenticationService implements AuthenticationService {
       code == GoogleSignInExceptionCode.canceled ||
       code == GoogleSignInExceptionCode.interrupted;
 
-  static AuthUser? _mapUser(User? user) {
+  static Future<AuthUser?> _mapUser(User? user) async {
     if (user == null) return null;
+    final token = await user.getIdTokenResult();
     return AuthUser(
       id: user.uid,
       email: user.email,
+      role: AccountRole.fromClaim(token.claims?['role']),
       displayName: user.displayName,
       photoUrl: user.photoURL,
     );
