@@ -7,6 +7,10 @@ export 'src/auth/authentication_service.dart';
 export 'src/auth/google_authentication_service.dart';
 export 'src/auth/role_permission_policy.dart';
 export 'src/auth/role_administration_service.dart';
+export 'src/forms/dynamic_form_definition.dart';
+export 'src/forms/dynamic_form_editor.dart';
+export 'src/forms/dynamic_form_repository.dart';
+export 'src/forms/dynamic_form_view.dart';
 
 /// Metadata for the shared foundation package.
 abstract final class AlramwarnagaFoundation {
