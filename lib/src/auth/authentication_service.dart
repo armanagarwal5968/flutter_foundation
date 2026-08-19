@@ -13,3 +13,12 @@ abstract interface class AuthenticationService {
 
   Future<void> signOut();
 }
+
+/// Optional capability implemented by authentication services that allow
+/// password-based sign-in, primarily for controlled development accounts.
+abstract interface class EmailPasswordAuthenticationService {
+  Future<AuthUser?> signInWithEmailPassword({
+    required String email,
+    required String password,
+  });
+}

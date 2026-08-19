@@ -10,7 +10,8 @@ import 'authentication_service.dart';
 ///
 /// Web uses Firebase's popup flow. Android and iOS use the native Google
 /// Sign-In SDK and exchange its ID token for a Firebase credential.
-class GoogleAuthenticationService implements AuthenticationService {
+class GoogleAuthenticationService
+    implements AuthenticationService, EmailPasswordAuthenticationService {
   GoogleAuthenticationService({
     FirebaseAuth? firebaseAuth,
     GoogleSignIn? googleSignIn,
@@ -72,6 +73,18 @@ class GoogleAuthenticationService implements AuthenticationService {
       );
     }
 
+    return _currentUser = await _mapUser(credential.user);
+  }
+
+  @override
+  Future<AuthUser?> signInWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    final credential = await _firebaseAuth.signInWithEmailAndPassword(
+      email: email.trim(),
+      password: password,
+    );
     return _currentUser = await _mapUser(credential.user);
   }
 
