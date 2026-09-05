@@ -39,6 +39,12 @@ class GoogleAuthenticationService
 
   @override
   Future<void> initialize() async {
+    if (kIsWeb) {
+      // Firebase JS SDK 12.17.0 can close its IndexedDB persistence while an
+      // OAuth popup hides the opener tab. Local persistence uses localStorage
+      // instead and still keeps the user signed in across browser restarts.
+      await _firebaseAuth.setPersistence(Persistence.LOCAL);
+    }
     _currentUser = await _mapUser(_firebaseAuth.currentUser);
     if (!kIsWeb) {
       _nativeInitialization ??= _googleSignIn.initialize(
