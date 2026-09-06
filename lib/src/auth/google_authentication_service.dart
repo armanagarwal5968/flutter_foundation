@@ -6,13 +6,13 @@ import 'auth_user.dart';
 import 'account_roles.dart';
 import 'authentication_service.dart';
 
-/// Firebase Authentication backed by Google Sign-In.
+/// Firebase Authentication backed by Google, Apple, and email/password.
 ///
 /// Web uses Firebase's popup flow. Android and iOS use the native Google
 /// Sign-In SDK and exchange its ID token for a Firebase credential.
-class GoogleAuthenticationService
+class FirebaseAuthenticationService
     implements AuthenticationService, EmailPasswordAuthenticationService {
-  GoogleAuthenticationService({
+  FirebaseAuthenticationService({
     FirebaseAuth? firebaseAuth,
     GoogleSignIn? googleSignIn,
     this.clientId,
@@ -83,6 +83,21 @@ class GoogleAuthenticationService
   }
 
   @override
+  Future<AuthUser?> signInWithApple() async {
+    final provider =
+        AppleAuthProvider()
+          ..addScope('email')
+          ..addScope('name');
+    final UserCredential credential;
+    if (kIsWeb) {
+      credential = await _firebaseAuth.signInWithPopup(provider);
+    } else {
+      credential = await _firebaseAuth.signInWithProvider(provider);
+    }
+    return _currentUser = await _mapUser(credential.user);
+  }
+
+  @override
   Future<AuthUser?> signInWithEmailPassword({
     required String email,
     required String password,
@@ -120,3 +135,7 @@ class GoogleAuthenticationService
     );
   }
 }
+
+/// Backward-compatible name retained for existing foundation consumers.
+@Deprecated('Use FirebaseAuthenticationService instead.')
+typedef GoogleAuthenticationService = FirebaseAuthenticationService;

@@ -11,6 +11,9 @@ abstract interface class AuthenticationService {
   /// Starts Google authentication, returning `null` when the user cancels.
   Future<AuthUser?> signInWithGoogle();
 
+  /// Starts Apple authentication.
+  Future<AuthUser?> signInWithApple();
+
   Future<void> signOut();
 }
 
