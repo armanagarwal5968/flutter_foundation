@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'dynamic_form_definition.dart';
+import 'dynamic_form_summary.dart';
 
 typedef DynamicFormSubmit = Future<void> Function(Map<String, Object?> values);
 
@@ -116,6 +117,27 @@ class _DynamicFormViewState extends State<DynamicFormView> {
     }
   }
 
+  Future<void> _reviewAndSubmit() async {
+    final validationError = _validateSection();
+    if (validationError != null) {
+      setState(() => _error = validationError);
+      return;
+    }
+    for (final controller in _controllers.entries) {
+      _values[controller.key] = controller.value.text.trim();
+    }
+    final confirmed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder:
+            (_) => DynamicFormConfirmationPage(
+              definition: widget.definition,
+              values: Map.unmodifiable(_values),
+            ),
+      ),
+    );
+    if (confirmed == true) await _submit();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.definition.sections.isEmpty) {
@@ -169,12 +191,21 @@ class _DynamicFormViewState extends State<DynamicFormView> {
             if (_sectionIndex > 0) const SizedBox(width: 12),
             Expanded(
               child: FilledButton(
-                onPressed: _submitting ? null : (isLast ? _submit : _continue),
+                onPressed:
+                    _submitting
+                        ? null
+                        : isLast
+                        ? (widget.definition.confirmBeforeSubmit
+                            ? _reviewAndSubmit
+                            : _submit)
+                        : _continue,
                 child: Text(
                   _submitting
                       ? 'Submitting...'
                       : isLast
-                      ? widget.definition.submitLabel
+                      ? (widget.definition.confirmBeforeSubmit
+                          ? 'Review answers'
+                          : widget.definition.submitLabel)
                       : 'Continue',
                 ),
               ),
@@ -350,4 +381,90 @@ class _DynamicFormViewState extends State<DynamicFormView> {
         );
     }
   }
+}
+
+class DynamicFormConfirmationPage extends StatelessWidget {
+  const DynamicFormConfirmationPage({
+    required this.definition,
+    required this.values,
+    super.key,
+  });
+
+  final DynamicFormDefinition definition;
+  final Map<String, Object?> values;
+
+  @override
+  Widget build(BuildContext context) {
+    final fields = {
+      for (final section in definition.sections)
+        for (final field in section.fields) field.id: field,
+    };
+    final summary = buildDynamicFormSummary(definition, values);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Review before submitting')),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Text(definition.title, style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 16),
+          if (summary.isNotEmpty) ...[
+            Text(
+              'Session summary preview',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [for (final item in summary) Text('• $item')],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          Text('Answers', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          for (final entry in values.entries)
+            if (_hasReviewValue(entry.value))
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(fields[entry.key]?.label ?? entry.key),
+                subtitle: Text(_reviewValue(fields[entry.key], entry.value)),
+              ),
+          const SizedBox(height: 20),
+          FilledButton.icon(
+            key: const Key('confirm-form-submit'),
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.check),
+            label: Text(definition.submitLabel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Go back and edit'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+bool _hasReviewValue(Object? value) =>
+    value != null && value != '' && !(value is Iterable && value.isEmpty);
+
+String _reviewValue(DynamicFormField? field, Object? value) {
+  if (value is bool) return value ? 'Yes' : 'No';
+  if (field != null && value is String) {
+    final option = field.options.where((option) => option.value == value);
+    if (option.isNotEmpty) return option.first.label;
+  }
+  if (field != null && value is Iterable) {
+    final selected = value.whereType<String>().toSet();
+    return field.options
+        .where((option) => selected.contains(option.value))
+        .map((option) => option.label)
+        .join(', ');
+  }
+  return '$value';
 }

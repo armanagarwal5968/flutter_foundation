@@ -21,23 +21,27 @@ class DynamicFieldOption {
     required this.value,
     required this.label,
     this.description,
+    this.includeInSummary = false,
   });
 
   final String value;
   final String label;
   final String? description;
+  final bool includeInSummary;
 
   factory DynamicFieldOption.fromJson(Map<String, dynamic> json) =>
       DynamicFieldOption(
         value: json['value'] as String,
         label: json['label'] as String,
         description: json['description'] as String?,
+        includeInSummary: json['includeInSummary'] as bool? ?? false,
       );
 
   Map<String, dynamic> toJson() => {
     'value': value,
     'label': label,
     if (description != null) 'description': description,
+    'includeInSummary': includeInSummary,
   };
 }
 
@@ -52,6 +56,7 @@ class DynamicFormField {
     this.options = const [],
     this.minimum,
     this.maximum,
+    this.includeInSummary = false,
   });
 
   final String id;
@@ -63,6 +68,7 @@ class DynamicFormField {
   final List<DynamicFieldOption> options;
   final num? minimum;
   final num? maximum;
+  final bool includeInSummary;
 
   factory DynamicFormField.fromJson(Map<String, dynamic> json) =>
       DynamicFormField(
@@ -81,6 +87,7 @@ class DynamicFormField {
             .toList(growable: false),
         minimum: json['minimum'] as num?,
         maximum: json['maximum'] as num?,
+        includeInSummary: json['includeInSummary'] as bool? ?? false,
       );
 
   Map<String, dynamic> toJson() => {
@@ -94,6 +101,7 @@ class DynamicFormField {
       'options': options.map((option) => option.toJson()).toList(),
     if (minimum != null) 'minimum': minimum,
     if (maximum != null) 'maximum': maximum,
+    'includeInSummary': includeInSummary,
   };
 }
 
@@ -142,6 +150,7 @@ class DynamicFormDefinition {
     this.version = 1,
     this.published = true,
     this.catalogVisible = true,
+    this.confirmBeforeSubmit = false,
   });
 
   final String id;
@@ -151,6 +160,7 @@ class DynamicFormDefinition {
   final int version;
   final bool published;
   final bool catalogVisible;
+  final bool confirmBeforeSubmit;
   final List<DynamicFormSection> sections;
 
   factory DynamicFormDefinition.fromJson(
@@ -164,6 +174,7 @@ class DynamicFormDefinition {
     version: json['version'] as int? ?? 1,
     published: json['published'] as bool? ?? false,
     catalogVisible: json['catalogVisible'] as bool? ?? true,
+    confirmBeforeSubmit: json['confirmBeforeSubmit'] as bool? ?? false,
     sections: (json['sections'] as List<dynamic>? ?? const [])
         .map(
           (section) => DynamicFormSection.fromJson(
@@ -180,6 +191,7 @@ class DynamicFormDefinition {
     'version': version,
     'published': published,
     'catalogVisible': catalogVisible,
+    'confirmBeforeSubmit': confirmBeforeSubmit,
     'sections': sections.map((section) => section.toJson()).toList(),
   };
 }

@@ -45,6 +45,65 @@ void main() {
     expect(parsed.sections.last.fields.single.type, DynamicFieldType.yesNo);
   });
 
+  test('summary includes marked choices and only Yes red flags', () {
+    const summaryDefinition = DynamicFormDefinition(
+      id: 'summary',
+      title: 'Summary',
+      confirmBeforeSubmit: true,
+      sections: [
+        DynamicFormSection(
+          id: 'review',
+          title: 'Review',
+          fields: [
+            DynamicFormField(
+              id: 'outcome',
+              label: 'Outcome',
+              type: DynamicFieldType.singleChoice,
+              options: [
+                DynamicFieldOption(value: 'normal', label: 'Normal'),
+                DynamicFieldOption(
+                  value: 'concern',
+                  label: 'Concern',
+                  includeInSummary: true,
+                ),
+              ],
+            ),
+            DynamicFormField(
+              id: 'fever',
+              label: 'Fever',
+              type: DynamicFieldType.yesNo,
+              includeInSummary: true,
+            ),
+            DynamicFormField(
+              id: 'jaundice',
+              label: 'Jaundice',
+              type: DynamicFieldType.yesNo,
+              includeInSummary: true,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    expect(
+      buildDynamicFormSummary(summaryDefinition, {
+        'outcome': 'concern',
+        'fever': true,
+        'jaundice': false,
+      }),
+      ['Outcome: Concern', 'Fever: Yes'],
+    );
+    final parsed = DynamicFormDefinition.fromJson(
+      summaryDefinition.id,
+      summaryDefinition.toJson(),
+    );
+    expect(parsed.confirmBeforeSubmit, isTrue);
+    expect(
+      parsed.sections.single.fields.first.options.last.includeInSummary,
+      isTrue,
+    );
+  });
+
   testWidgets('multi-step form accepts No and submits values', (tester) async {
     Map<String, Object?>? submitted;
     await tester.pumpWidget(
@@ -144,5 +203,51 @@ void main() {
     await tester.tap(find.text('Submit'));
     await tester.pump();
     expect(find.text('Preview completed. Nothing was saved.'), findsOneWidget);
+  });
+
+  testWidgets('review page blocks submission until final confirmation', (
+    tester,
+  ) async {
+    Map<String, Object?>? submitted;
+    const reviewDefinition = DynamicFormDefinition(
+      id: 'review',
+      title: 'Review form',
+      confirmBeforeSubmit: true,
+      sections: [
+        DynamicFormSection(
+          id: 'answer',
+          title: 'Answer',
+          fields: [
+            DynamicFormField(
+              id: 'notes',
+              label: 'Notes',
+              type: DynamicFieldType.text,
+              required: true,
+              includeInSummary: true,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DynamicFormView(
+            definition: reviewDefinition,
+            onSubmit: (values) async => submitted = values,
+          ),
+        ),
+      ),
+    );
+    await tester.enterText(find.byType(TextFormField), 'Looks good');
+    await tester.tap(find.text('Review answers'));
+    await tester.pumpAndSettle();
+
+    expect(submitted, isNull);
+    expect(find.text('• Notes: Looks good'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('confirm-form-submit')));
+    await tester.pumpAndSettle();
+    expect(submitted, {'notes': 'Looks good'});
   });
 }

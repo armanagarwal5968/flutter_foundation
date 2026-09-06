@@ -11,6 +11,7 @@ export 'src/forms/dynamic_form_definition.dart';
 export 'src/forms/dynamic_form_editor.dart';
 export 'src/forms/dynamic_form_preview.dart';
 export 'src/forms/dynamic_form_repository.dart';
+export 'src/forms/dynamic_form_summary.dart';
 export 'src/forms/dynamic_form_view.dart';
 
 /// Metadata for the shared foundation package.

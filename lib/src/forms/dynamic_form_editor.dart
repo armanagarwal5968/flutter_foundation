@@ -25,6 +25,7 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
   late List<DynamicFormSection> _sections;
   late bool _published;
   late bool _catalogVisible;
+  late bool _confirmBeforeSubmit;
   bool _saving = false;
 
   @override
@@ -36,6 +37,7 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
     _sections = List.of(widget.form.sections);
     _published = widget.form.published;
     _catalogVisible = widget.form.catalogVisible;
+    _confirmBeforeSubmit = widget.form.confirmBeforeSubmit;
   }
 
   @override
@@ -68,6 +70,7 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
         version: version,
         published: _published,
         catalogVisible: _catalogVisible,
+        confirmBeforeSubmit: _confirmBeforeSubmit,
         sections: _sections,
       );
 
@@ -145,11 +148,16 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
     final label = TextEditingController(text: existing?.label);
     final description = TextEditingController(text: existing?.description);
     final placeholder = TextEditingController(text: existing?.placeholder);
-    final options = TextEditingController(
-      text: existing?.options.map((option) => option.label).join('\n'),
-    );
+    final optionRows = <_EditableOptionRow>[];
+    final allOptionRows = <_EditableOptionRow>[];
+    for (final option in existing?.options ?? const <DynamicFieldOption>[]) {
+      final row = _EditableOptionRow.fromOption(option);
+      optionRows.add(row);
+      allOptionRows.add(row);
+    }
     var type = existing?.type ?? DynamicFieldType.text;
     var required = existing?.required ?? false;
+    var includeInSummary = existing?.includeInSummary ?? false;
     final result = await showDialog<DynamicFormField>(
       context: context,
       builder:
@@ -191,13 +199,101 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
                           ),
                         ),
                         if (type == DynamicFieldType.singleChoice ||
-                            type == DynamicFieldType.multiChoice)
-                          TextField(
-                            controller: options,
-                            minLines: 3,
-                            maxLines: 6,
-                            decoration: const InputDecoration(
-                              labelText: 'Options (one per line)',
+                            type == DynamicFieldType.multiChoice) ...[
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Options',
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                          ),
+                          for (
+                            var optionIndex = 0;
+                            optionIndex < optionRows.length;
+                            optionIndex++
+                          )
+                            Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(8),
+                                child: Column(
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: TextField(
+                                            controller:
+                                                optionRows[optionIndex].label,
+                                            decoration: const InputDecoration(
+                                              labelText: 'Option label',
+                                            ),
+                                          ),
+                                        ),
+                                        IconButton(
+                                          tooltip: 'Delete option',
+                                          onPressed:
+                                              () => setDialogState(
+                                                () => optionRows.removeAt(
+                                                  optionIndex,
+                                                ),
+                                              ),
+                                          icon: const Icon(
+                                            Icons.delete_outline,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    TextField(
+                                      controller:
+                                          optionRows[optionIndex].description,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Description (optional)',
+                                      ),
+                                    ),
+                                    CheckboxListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      value:
+                                          optionRows[optionIndex]
+                                              .includeInSummary,
+                                      onChanged:
+                                          (value) => setDialogState(
+                                            () =>
+                                                optionRows[optionIndex]
+                                                        .includeInSummary =
+                                                    value ?? false,
+                                          ),
+                                      title: const Text(
+                                        'Part of session summary',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              final row = _EditableOptionRow.empty();
+                              allOptionRows.add(row);
+                              setDialogState(() => optionRows.add(row));
+                            },
+                            icon: const Icon(Icons.add),
+                            label: const Text('Add option'),
+                          ),
+                        ],
+                        if (type != DynamicFieldType.info &&
+                            type != DynamicFieldType.singleChoice &&
+                            type != DynamicFieldType.multiChoice)
+                          CheckboxListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: includeInSummary,
+                            onChanged:
+                                (value) => setDialogState(
+                                  () => includeInSummary = value ?? false,
+                                ),
+                            title: Text(
+                              type == DynamicFieldType.yesNo
+                                  ? 'Add Yes to session summary'
+                                  : 'Include answer in session summary',
                             ),
                           ),
                         SwitchListTile(
@@ -237,21 +333,13 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
                                   type == DynamicFieldType.rating ? 1 : null,
                               maximum:
                                   type == DynamicFieldType.rating ? 5 : null,
-                              options:
-                                  options.text
-                                      .split('\n')
-                                      .map((line) => line.trim())
-                                      .where((line) => line.isNotEmpty)
-                                      .map(
-                                        (line) => DynamicFieldOption(
-                                          value: line.toLowerCase().replaceAll(
-                                            RegExp(r'[^a-z0-9]+'),
-                                            '_',
-                                          ),
-                                          label: line,
-                                        ),
-                                      )
-                                      .toList(),
+                              includeInSummary: includeInSummary,
+                              options: optionRows
+                                  .where(
+                                    (row) => row.label.text.trim().isNotEmpty,
+                                  )
+                                  .map((row) => row.toOption())
+                                  .toList(growable: false),
                             ),
                           ),
                       child: const Text('Save'),
@@ -263,7 +351,9 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
     label.dispose();
     description.dispose();
     placeholder.dispose();
-    options.dispose();
+    for (final row in allOptionRows) {
+      row.dispose();
+    }
     return result;
   }
 
@@ -310,6 +400,12 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
             value: _catalogVisible,
             onChanged: (value) => setState(() => _catalogVisible = value),
             title: const Text('Show in form catalog'),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _confirmBeforeSubmit,
+            onChanged: (value) => setState(() => _confirmBeforeSubmit = value),
+            title: const Text('Review answers before submitting'),
           ),
           const Divider(),
           for (
@@ -411,5 +507,52 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
         ],
       ),
     );
+  }
+}
+
+class _EditableOptionRow {
+  _EditableOptionRow({
+    required this.value,
+    required this.label,
+    required this.description,
+    required this.includeInSummary,
+  });
+
+  factory _EditableOptionRow.fromOption(DynamicFieldOption option) =>
+      _EditableOptionRow(
+        value: option.value,
+        label: TextEditingController(text: option.label),
+        description: TextEditingController(text: option.description),
+        includeInSummary: option.includeInSummary,
+      );
+
+  factory _EditableOptionRow.empty() => _EditableOptionRow(
+    value: null,
+    label: TextEditingController(),
+    description: TextEditingController(),
+    includeInSummary: false,
+  );
+
+  final String? value;
+  final TextEditingController label;
+  final TextEditingController description;
+  bool includeInSummary;
+
+  DynamicFieldOption toOption() {
+    final optionLabel = label.text.trim();
+    return DynamicFieldOption(
+      value:
+          value ??
+          optionLabel.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_'),
+      label: optionLabel,
+      description:
+          description.text.trim().isEmpty ? null : description.text.trim(),
+      includeInSummary: includeInSummary,
+    );
+  }
+
+  void dispose() {
+    label.dispose();
+    description.dispose();
   }
 }
