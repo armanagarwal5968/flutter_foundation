@@ -67,4 +67,82 @@ void main() {
 
     expect(submitted, {'name': 'Mother', 'first_pregnancy': false});
   });
+
+  testWidgets('multi-choice requires and submits selected options', (
+    tester,
+  ) async {
+    Map<String, Object?>? submitted;
+    const multiChoiceDefinition = DynamicFormDefinition(
+      id: 'preferences',
+      title: 'Preferences',
+      sections: [
+        DynamicFormSection(
+          id: 'topics',
+          title: 'Topics',
+          fields: [
+            DynamicFormField(
+              id: 'support_topics',
+              label: 'Support topics',
+              type: DynamicFieldType.multiChoice,
+              required: true,
+              options: [
+                DynamicFieldOption(value: 'nutrition', label: 'Nutrition'),
+                DynamicFieldOption(value: 'exercise', label: 'Exercise'),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DynamicFormView(
+            definition: multiChoiceDefinition,
+            onSubmit: (values) async => submitted = values,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Submit'));
+    await tester.pump();
+    expect(find.text('Support topics is required.'), findsOneWidget);
+
+    await tester.tap(find.text('Nutrition'));
+    await tester.tap(find.text('Exercise'));
+    await tester.tap(find.text('Submit'));
+    await tester.pumpAndSettle();
+
+    expect(submitted, {
+      'support_topics': ['nutrition', 'exercise'],
+    });
+  });
+
+  testWidgets('preview identifies itself and does not save a response', (
+    tester,
+  ) async {
+    const previewDefinition = DynamicFormDefinition(
+      id: 'preview',
+      title: 'Preview form',
+      sections: [
+        DynamicFormSection(id: 'empty', title: 'Preview step', fields: []),
+      ],
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: DynamicFormPreviewPage(definition: previewDefinition),
+      ),
+    );
+
+    expect(
+      find.text('Preview mode — responses are not saved.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Submit'));
+    await tester.pump();
+    expect(find.text('Preview completed. Nothing was saved.'), findsOneWidget);
+  });
 }

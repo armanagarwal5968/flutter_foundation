@@ -32,6 +32,10 @@ Foundation provides Firebase-backed, app-neutral dynamic forms:
 - `FirestoreDynamicFormRepository` for live definitions and callable submissions
 - `DynamicFormView` for multi-step rendering and client validation
 - `DynamicFormEditorPage` for structured administrator editing
+- `DynamicFormPreviewPage` for a no-write, user-exact preview
+
+Field types include single- and multi-choice options. Multi-choice responses
+are represented as a list of configured option IDs.
 
 Definitions live in `form_definitions/{formId}`. Consuming apps configure
 Firestore Security Rules and the `submitDynamicForm` callable backend; the

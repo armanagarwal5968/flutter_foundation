@@ -63,7 +63,9 @@ class _DynamicFormViewState extends State<DynamicFormView> {
     for (final field in _section.fields) {
       if (field.type == DynamicFieldType.info || !field.required) continue;
       final value = _valueFor(field);
-      if (value == null || value == '') {
+      if (value == null ||
+          value == '' ||
+          (value is Iterable && value.isEmpty)) {
         return '${field.label} is required.';
       }
     }
@@ -287,6 +289,42 @@ class _DynamicFormViewState extends State<DynamicFormView> {
                         ? null
                         : Text(option.description!),
                 onChanged: (value) => setState(() => _values[field.id] = value),
+              ),
+          ],
+        );
+      case DynamicFieldType.multiChoice:
+        final selected = Set<String>.from(
+          (_values[field.id] as Iterable?)?.whereType<String>() ?? const [],
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${field.label}${field.required ? ' *' : ''}'),
+            if (helper != null) Text(helper),
+            for (final option in field.options)
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: selected.contains(option.value),
+                title: Text(option.label),
+                subtitle:
+                    option.description == null
+                        ? null
+                        : Text(option.description!),
+                onChanged: (checked) {
+                  final updated = Set<String>.from(
+                    (_values[field.id] as Iterable?)?.whereType<String>() ??
+                        const [],
+                  );
+                  if (checked ?? false) {
+                    updated.add(option.value);
+                  } else {
+                    updated.remove(option.value);
+                  }
+                  setState(
+                    () => _values[field.id] = updated.toList(growable: false),
+                  );
+                },
               ),
           ],
         );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'dynamic_form_definition.dart';
+import 'dynamic_form_preview.dart';
 import 'dynamic_form_repository.dart';
 
 class DynamicFormEditorPage extends StatefulWidget {
@@ -49,24 +50,36 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
     setState(() => _saving = true);
     try {
       await widget.repository.saveForm(
-        DynamicFormDefinition(
-          id: widget.form.id,
-          title: _title.text.trim(),
-          description:
-              _description.text.trim().isEmpty
-                  ? null
-                  : _description.text.trim(),
-          submitLabel: _submitLabel.text.trim(),
-          version: widget.form.version + 1,
-          published: _published,
-          catalogVisible: _catalogVisible,
-          sections: _sections,
-        ),
+        _currentDefinition(version: widget.form.version + 1),
       );
       if (mounted) Navigator.of(context).pop();
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  DynamicFormDefinition _currentDefinition({required int version}) =>
+      DynamicFormDefinition(
+        id: widget.form.id,
+        title: _title.text.trim(),
+        description:
+            _description.text.trim().isEmpty ? null : _description.text.trim(),
+        submitLabel: _submitLabel.text.trim(),
+        version: version,
+        published: _published,
+        catalogVisible: _catalogVisible,
+        sections: _sections,
+      );
+
+  void _preview() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder:
+            (_) => DynamicFormPreviewPage(
+              definition: _currentDefinition(version: widget.form.version),
+            ),
+      ),
+    );
   }
 
   Future<void> _addSection() async {
@@ -177,7 +190,8 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
                             labelText: 'Placeholder',
                           ),
                         ),
-                        if (type == DynamicFieldType.singleChoice)
+                        if (type == DynamicFieldType.singleChoice ||
+                            type == DynamicFieldType.multiChoice)
                           TextField(
                             controller: options,
                             minLines: 3,
@@ -259,6 +273,11 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
       appBar: AppBar(
         title: const Text('Edit form'),
         actions: [
+          IconButton(
+            tooltip: 'Preview as user',
+            onPressed: _preview,
+            icon: const Icon(Icons.visibility_outlined),
+          ),
           TextButton(
             onPressed: _saving ? null : _save,
             child: Text(_saving ? 'Saving...' : 'Save'),
