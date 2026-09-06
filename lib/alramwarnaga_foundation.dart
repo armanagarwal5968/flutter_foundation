@@ -14,6 +14,7 @@ export 'src/forms/dynamic_form_repository.dart';
 export 'src/forms/dynamic_form_summary.dart';
 export 'src/forms/dynamic_form_view.dart';
 export 'src/media/session_media.dart';
+export 'src/telemetry/firebase_telemetry.dart';
 
 /// Metadata for the shared foundation package.
 abstract final class AlramwarnagaFoundation {
