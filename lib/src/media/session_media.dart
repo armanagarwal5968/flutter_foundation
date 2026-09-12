@@ -228,6 +228,22 @@ class SessionMediaRepository {
     'mediaId': mediaId,
   });
 
+  Future<void> updateStandardMedia({
+    required String sessionId,
+    required String mediaId,
+    required String title,
+    required int sortOrder,
+    String? description,
+    bool published = true,
+  }) => _functions.httpsCallable('updateStandardSessionMedia').call({
+    'sessionId': sessionId,
+    'mediaId': mediaId,
+    'title': title,
+    'description': description,
+    'sortOrder': sortOrder,
+    'published': published,
+  });
+
   Future<void> archivePatientMedia({
     required String patientId,
     required String sessionId,
@@ -312,6 +328,7 @@ class SessionMediaSection extends StatelessWidget {
     required this.repository,
     this.emptyMessage = 'No files have been added.',
     this.onArchive,
+    this.onEdit,
     super.key,
   });
 
@@ -320,6 +337,7 @@ class SessionMediaSection extends StatelessWidget {
   final SessionMediaRepository repository;
   final String emptyMessage;
   final Future<void> Function(SessionMediaAsset asset)? onArchive;
+  final Future<void> Function(SessionMediaAsset asset)? onEdit;
 
   @override
   Widget build(BuildContext context) => StreamBuilder<List<SessionMediaAsset>>(
@@ -359,26 +377,36 @@ class SessionMediaSection extends StatelessWidget {
                   ].join('\n'),
                 ),
                 trailing:
-                    onArchive == null
+                    onArchive == null && onEdit == null
                         ? const Icon(Icons.open_in_new)
                         : PopupMenuButton<String>(
                           onSelected: (value) {
                             if (value == 'open') _open(context, asset);
-                            if (value == 'archive') onArchive!(asset);
+                            if (value == 'edit') onEdit?.call(asset);
+                            if (value == 'archive') onArchive?.call(asset);
                           },
                           itemBuilder:
-                              (_) => const [
-                                PopupMenuItem(
+                              (_) => [
+                                const PopupMenuItem(
                                   value: 'open',
                                   child: Text('Open'),
                                 ),
-                                PopupMenuItem(
-                                  value: 'archive',
-                                  child: Text('Archive'),
-                                ),
+                                if (onEdit != null)
+                                  const PopupMenuItem(
+                                    value: 'edit',
+                                    child: Text('Edit details'),
+                                  ),
+                                if (onArchive != null)
+                                  const PopupMenuItem(
+                                    value: 'archive',
+                                    child: Text('Archive'),
+                                  ),
                               ],
                         ),
-                onTap: onArchive == null ? () => _open(context, asset) : null,
+                onTap:
+                    onArchive == null && onEdit == null
+                        ? () => _open(context, asset)
+                        : null,
               ),
             ),
         ],
