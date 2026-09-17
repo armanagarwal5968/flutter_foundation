@@ -8,6 +8,7 @@ enum DynamicFieldType {
   yesNo,
   singleChoice,
   multiChoice,
+  fileUpload,
   rating;
 
   static DynamicFieldType fromJson(Object? value) => values.firstWhere(

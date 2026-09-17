@@ -354,4 +354,56 @@ void main() {
     await tester.pumpAndSettle();
     expect(submitted, {'notes': 'Looks good'});
   });
+
+  testWidgets('file upload stores response-safe metadata', (tester) async {
+    Map<String, Object?>? submitted;
+    const definition = DynamicFormDefinition(
+      id: 'enrolment',
+      title: 'Enrollment',
+      sections: [
+        DynamicFormSection(
+          id: 'reports',
+          title: 'Reports',
+          fields: [
+            DynamicFormField(
+              id: 'latest_reports',
+              label: 'Latest reports',
+              type: DynamicFieldType.fileUpload,
+              options: [
+                DynamicFieldOption(value: 'cbc_report', label: 'CBC report'),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DynamicFormView(
+            definition: definition,
+            fileUploader:
+                ({required formId, required fieldId, category}) async => {
+                  'storagePath': 'form_uploads/user/$formId/$fieldId/file.pdf',
+                  'fileName': 'file.pdf',
+                  'category': category,
+                },
+            onSubmit: (values) async => submitted = values,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Upload CBC report'));
+    await tester.pumpAndSettle();
+    expect(find.text('file.pdf'), findsOneWidget);
+    await tester.tap(find.text('Submit'));
+    await tester.pumpAndSettle();
+
+    final uploads = submitted!['latest_reports']! as List<Object?>;
+    final upload = Map<String, Object?>.from(uploads.single! as Map);
+    expect(upload['category'], 'CBC report');
+    expect(upload['fileName'], 'file.pdf');
+  });
 }

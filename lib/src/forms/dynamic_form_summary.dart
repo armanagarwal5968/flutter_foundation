@@ -41,6 +41,7 @@ List<String> buildDynamicFormSummary(
             summary.add('${field.label}: Yes');
           }
         case DynamicFieldType.info:
+        case DynamicFieldType.fileUpload:
           break;
         case DynamicFieldType.text:
         case DynamicFieldType.multiline:

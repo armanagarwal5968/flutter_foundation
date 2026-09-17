@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'dynamic_form_definition.dart';
+import 'dynamic_form_file_upload.dart';
 import 'dynamic_form_summary.dart';
 import '../formatting/friendly_date.dart';
 
@@ -11,12 +12,14 @@ class DynamicFormView extends StatefulWidget {
     required this.definition,
     required this.onSubmit,
     this.initialValues = const {},
+    this.fileUploader,
     super.key,
   });
 
   final DynamicFormDefinition definition;
   final DynamicFormSubmit onSubmit;
   final Map<String, Object?> initialValues;
+  final DynamicFormFileUploader? fileUploader;
 
   @override
   State<DynamicFormView> createState() => _DynamicFormViewState();
@@ -402,6 +405,48 @@ class _DynamicFormViewState extends State<DynamicFormView> {
               ),
           ],
         );
+      case DynamicFieldType.fileUpload:
+        final uploads =
+            (_values[field.id] as Iterable?)
+                ?.whereType<Map>()
+                .map((item) => Map<String, Object?>.from(item))
+                .toList(growable: false) ??
+            const <Map<String, Object?>>[];
+        final categories =
+            field.options.isEmpty
+                ? const <DynamicFieldOption>[
+                  DynamicFieldOption(value: 'file', label: 'File'),
+                ]
+                : field.options;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${field.label}${field.required ? ' *' : ''}'),
+            if (helper != null) Text(helper),
+            const SizedBox(height: 8),
+            for (final category in categories)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: OutlinedButton.icon(
+                  onPressed:
+                      _submitting ? null : () => _uploadFile(field, category),
+                  icon: const Icon(Icons.upload_file),
+                  label: Text('Upload ${category.label}'),
+                ),
+              ),
+            for (final upload in uploads)
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.attach_file),
+                title: Text('${upload['fileName'] ?? 'Uploaded file'}'),
+                subtitle:
+                    upload['category'] == null
+                        ? null
+                        : Text('${upload['category']}'),
+              ),
+          ],
+        );
       case DynamicFieldType.rating:
         final rating = _values[field.id] as int? ?? 0;
         return Column(
@@ -422,6 +467,38 @@ class _DynamicFormViewState extends State<DynamicFormView> {
             ),
           ],
         );
+    }
+  }
+
+  Future<void> _uploadFile(
+    DynamicFormField field,
+    DynamicFieldOption category,
+  ) async {
+    final uploader =
+        widget.fileUploader ?? FirebaseDynamicFormFileUploader().upload;
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      final upload = await uploader(
+        formId: widget.definition.id,
+        fieldId: field.id,
+        category: category.label,
+      );
+      if (upload == null || !mounted) return;
+      final existing =
+          (_values[field.id] as Iterable?)
+              ?.whereType<Map>()
+              .map((item) => Map<String, Object?>.from(item))
+              .where((item) => item['category'] != category.label)
+              .toList() ??
+          <Map<String, Object?>>[];
+      setState(() => _values[field.id] = [...existing, upload]);
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
   }
 }
@@ -506,6 +583,15 @@ String _reviewValue(DynamicFormField? field, Object? value) {
     if (option.isNotEmpty) return option.first.label;
   }
   if (field != null && value is Iterable) {
+    if (field.type == DynamicFieldType.fileUpload) {
+      return value
+          .whereType<Map>()
+          .map(
+            (item) =>
+                '${item['category'] ?? 'File'}: ${item['fileName'] ?? 'Uploaded'}',
+          )
+          .join(', ');
+    }
     final selected = value.whereType<String>().toSet();
     return field.options
         .where((option) => selected.contains(option.value))
