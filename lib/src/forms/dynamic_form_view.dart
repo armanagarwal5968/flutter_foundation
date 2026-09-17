@@ -310,6 +310,44 @@ class _DynamicFormViewState extends State<DynamicFormView> {
           ],
         );
       case DynamicFieldType.singleChoice:
+        if (field.options.length > 10) {
+          final selected = _values[field.id] as String?;
+          final selectedDescription =
+              field.options
+                  .where((option) => option.value == selected)
+                  .firstOrNull
+                  ?.description;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DropdownButtonFormField<String>(
+                key: ValueKey('single-choice-dropdown-${field.id}'),
+                value: selected,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: '${field.label}${field.required ? ' *' : ''}',
+                  helperText: helper,
+                  border: const OutlineInputBorder(),
+                ),
+                items: [
+                  for (final option in field.options)
+                    DropdownMenuItem<String>(
+                      value: option.value,
+                      child: Text(
+                        option.label,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                onChanged: (value) => setState(() => _values[field.id] = value),
+              ),
+              if (selectedDescription != null) ...[
+                const SizedBox(height: 6),
+                Text(selectedDescription),
+              ],
+            ],
+          );
+        }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

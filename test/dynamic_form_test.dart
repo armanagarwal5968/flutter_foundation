@@ -179,6 +179,110 @@ void main() {
     });
   });
 
+  testWidgets('single choice with more than ten options uses a dropdown', (
+    tester,
+  ) async {
+    Map<String, Object?>? submitted;
+    final manyOptions = List.generate(
+      11,
+      (index) => DynamicFieldOption(
+        value: 'option_${index + 1}',
+        label: 'Option ${index + 1}',
+      ),
+    );
+    final dropdownDefinition = DynamicFormDefinition(
+      id: 'many_options',
+      title: 'Many options',
+      sections: [
+        DynamicFormSection(
+          id: 'choice',
+          title: 'Choice',
+          fields: [
+            DynamicFormField(
+              id: 'large_choice',
+              label: 'Large choice',
+              type: DynamicFieldType.singleChoice,
+              required: true,
+              options: manyOptions,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DynamicFormView(
+            definition: dropdownDefinition,
+            onSubmit: (values) async => submitted = values,
+          ),
+        ),
+      ),
+    );
+
+    final dropdown = find.byKey(
+      const ValueKey('single-choice-dropdown-large_choice'),
+    );
+    expect(dropdown, findsOneWidget);
+    expect(find.byType(RadioListTile<String>), findsNothing);
+
+    await tester.tap(dropdown);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Option 5').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Submit'));
+    await tester.pumpAndSettle();
+
+    expect(submitted, {'large_choice': 'option_5'});
+  });
+
+  testWidgets('single choice with ten options keeps radio buttons', (
+    tester,
+  ) async {
+    final radioDefinition = DynamicFormDefinition(
+      id: 'ten_options',
+      title: 'Ten options',
+      sections: [
+        DynamicFormSection(
+          id: 'choice',
+          title: 'Choice',
+          fields: [
+            DynamicFormField(
+              id: 'short_choice',
+              label: 'Short choice',
+              type: DynamicFieldType.singleChoice,
+              options: List.generate(
+                10,
+                (index) => DynamicFieldOption(
+                  value: 'option_${index + 1}',
+                  label: 'Option ${index + 1}',
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DynamicFormView(
+            definition: radioDefinition,
+            onSubmit: (_) async {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(RadioListTile<String>), findsNWidgets(10));
+    expect(
+      find.byKey(const ValueKey('single-choice-dropdown-short_choice')),
+      findsNothing,
+    );
+  });
+
   testWidgets('preview identifies itself and does not save a response', (
     tester,
   ) async {
