@@ -64,30 +64,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
     DynamicFieldType.number,
   }.contains(type);
 
-  String? _validateSection() {
-    for (final field in _section.fields) {
-      if (field.type == DynamicFieldType.info || !field.required) continue;
-      final value = _valueFor(field);
-      if (value == null ||
-          value == '' ||
-          (value is Iterable && value.isEmpty)) {
-        return '${field.label} is required.';
-      }
-    }
-    return null;
-  }
-
-  Object? _valueFor(DynamicFormField field) =>
-      _usesController(field.type)
-          ? _controllers[field.id]!.text.trim()
-          : _values[field.id];
-
   void _continue() {
-    final validationError = _validateSection();
-    if (validationError != null) {
-      setState(() => _error = validationError);
-      return;
-    }
     for (final field in _section.fields.where(
       (field) => _usesController(field.type),
     )) {
@@ -100,11 +77,6 @@ class _DynamicFormViewState extends State<DynamicFormView> {
   }
 
   Future<void> _submit() async {
-    final validationError = _validateSection();
-    if (validationError != null) {
-      setState(() => _error = validationError);
-      return;
-    }
     for (final controller in _controllers.entries) {
       _values[controller.key] = controller.value.text.trim();
     }
@@ -122,11 +94,6 @@ class _DynamicFormViewState extends State<DynamicFormView> {
   }
 
   Future<void> _reviewAndSubmit() async {
-    final validationError = _validateSection();
-    if (validationError != null) {
-      setState(() => _error = validationError);
-      return;
-    }
     for (final controller in _controllers.entries) {
       _values[controller.key] = controller.value.text.trim();
     }
@@ -256,7 +223,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
             _ => TextInputType.text,
           },
           decoration: InputDecoration(
-            labelText: '${field.label}${field.required ? ' *' : ''}',
+            labelText: field.label,
             hintText: field.placeholder,
             helperText: helper,
             border: const OutlineInputBorder(),
@@ -271,7 +238,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
             side: BorderSide(color: Theme.of(context).colorScheme.outline),
             borderRadius: BorderRadius.circular(4),
           ),
-          title: Text('${field.label}${field.required ? ' *' : ''}'),
+          title: Text(field.label),
           subtitle: Text(
             value == null
                 ? field.placeholder ?? 'Select date'
@@ -294,7 +261,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${field.label}${field.required ? ' *' : ''}'),
+            Text(field.label),
             if (helper != null) Text(helper),
             SegmentedButton<bool>(
               segments: const [
@@ -328,7 +295,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
                 value: selected,
                 isExpanded: true,
                 decoration: InputDecoration(
-                  labelText: '${field.label}${field.required ? ' *' : ''}',
+                  labelText: field.label,
                   helperText: helper,
                   border: const OutlineInputBorder(),
                 ),
@@ -354,7 +321,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${field.label}${field.required ? ' *' : ''}'),
+            Text(field.label),
             if (helper != null) Text(helper),
             for (final option in field.options)
               RadioListTile<String>(
@@ -376,7 +343,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${field.label}${field.required ? ' *' : ''}'),
+            Text(field.label),
             if (helper != null) Text(helper),
             for (final option in field.options)
               CheckboxListTile(
@@ -421,7 +388,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${field.label}${field.required ? ' *' : ''}'),
+            Text(field.label),
             if (helper != null) Text(helper),
             const SizedBox(height: 8),
             for (final category in categories)
@@ -452,7 +419,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${field.label}${field.required ? ' *' : ''}'),
+            Text(field.label),
             Row(
               children: [
                 for (var index = 1; index <= (field.maximum ?? 5); index++)

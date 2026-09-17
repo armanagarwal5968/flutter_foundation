@@ -127,7 +127,7 @@ void main() {
     expect(submitted, {'name': 'Mother', 'first_pregnancy': false});
   });
 
-  testWidgets('multi-choice requires and submits selected options', (
+  testWidgets('required metadata does not block an empty submission', (
     tester,
   ) async {
     Map<String, Object?>? submitted;
@@ -166,17 +166,10 @@ void main() {
     );
 
     await tester.tap(find.text('Submit'));
-    await tester.pump();
-    expect(find.text('Support topics is required.'), findsOneWidget);
-
-    await tester.tap(find.text('Nutrition'));
-    await tester.tap(find.text('Exercise'));
-    await tester.tap(find.text('Submit'));
     await tester.pumpAndSettle();
 
-    expect(submitted, {
-      'support_topics': ['nutrition', 'exercise'],
-    });
+    expect(submitted, isEmpty);
+    expect(find.textContaining('*'), findsNothing);
   });
 
   testWidgets('single choice with more than ten options uses a dropdown', (
