@@ -1,4 +1,5 @@
 import 'dynamic_form_definition.dart';
+import '../formatting/friendly_date.dart';
 
 /// Builds the summary configured by form and option metadata.
 List<String> buildDynamicFormSummary(
@@ -45,10 +46,13 @@ List<String> buildDynamicFormSummary(
         case DynamicFieldType.multiline:
         case DynamicFieldType.phone:
         case DynamicFieldType.number:
-        case DynamicFieldType.date:
         case DynamicFieldType.rating:
           if (field.includeInSummary) {
             summary.add('${field.label}: $value');
+          }
+        case DynamicFieldType.date:
+          if (field.includeInSummary) {
+            summary.add('${field.label}: ${formatFriendlyDateValue(value)}');
           }
       }
     }

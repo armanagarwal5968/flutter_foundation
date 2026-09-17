@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'dynamic_form_definition.dart';
 import 'dynamic_form_summary.dart';
+import '../formatting/friendly_date.dart';
 
 typedef DynamicFormSubmit = Future<void> Function(Map<String, Object?> values);
 
@@ -268,7 +269,11 @@ class _DynamicFormViewState extends State<DynamicFormView> {
             borderRadius: BorderRadius.circular(4),
           ),
           title: Text('${field.label}${field.required ? ' *' : ''}'),
-          subtitle: Text(value ?? field.placeholder ?? 'Select date'),
+          subtitle: Text(
+            value == null
+                ? field.placeholder ?? 'Select date'
+                : formatFriendlyDateValue(value),
+          ),
           trailing: const Icon(Icons.calendar_today),
           onTap: () async {
             final selected = await showDatePicker(
@@ -455,6 +460,9 @@ bool _hasReviewValue(Object? value) =>
 
 String _reviewValue(DynamicFormField? field, Object? value) {
   if (value is bool) return value ? 'Yes' : 'No';
+  if (field?.type == DynamicFieldType.date) {
+    return formatFriendlyDateValue(value);
+  }
   if (field != null && value is String) {
     final option = field.options.where((option) => option.value == value);
     if (option.isNotEmpty) return option.first.label;
