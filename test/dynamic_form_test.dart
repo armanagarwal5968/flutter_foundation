@@ -45,6 +45,54 @@ void main() {
     expect(parsed.sections.last.fields.single.type, DynamicFieldType.yesNo);
   });
 
+  testWidgets('info fields expose a privacy-policy link', (tester) async {
+    const linkedDefinition = DynamicFormDefinition(
+      id: 'linked_info',
+      title: 'Consent',
+      sections: [
+        DynamicFormSection(
+          id: 'notice',
+          title: 'Notice',
+          fields: [
+            DynamicFormField(
+              id: 'privacy',
+              label: 'Privacy notice',
+              type: DynamicFieldType.info,
+              linkLabel: 'Read the privacy policy',
+              linkUrl: 'https://example.com/privacy',
+            ),
+          ],
+        ),
+      ],
+    );
+
+    final parsed = DynamicFormDefinition.fromJson(
+      linkedDefinition.id,
+      linkedDefinition.toJson(),
+    );
+    expect(
+      parsed.sections.single.fields.single.linkUrl,
+      'https://example.com/privacy',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DynamicFormView(
+            definition: linkedDefinition,
+            onSubmit: (_) async {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Read the privacy policy'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('dynamic-form-link-privacy')),
+      findsOneWidget,
+    );
+  });
+
   test('summary includes marked choices and only Yes red flags', () {
     const summaryDefinition = DynamicFormDefinition(
       id: 'summary',

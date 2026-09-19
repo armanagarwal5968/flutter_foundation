@@ -147,6 +147,8 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
   Future<DynamicFormField?> _fieldDialog([DynamicFormField? existing]) async {
     final label = TextEditingController(text: existing?.label);
     final description = TextEditingController(text: existing?.description);
+    final linkLabel = TextEditingController(text: existing?.linkLabel);
+    final linkUrl = TextEditingController(text: existing?.linkUrl);
     final placeholder = TextEditingController(text: existing?.placeholder);
     final optionRows = <_EditableOptionRow>[];
     final allOptionRows = <_EditableOptionRow>[];
@@ -198,6 +200,21 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
                             labelText: 'Placeholder',
                           ),
                         ),
+                        if (type == DynamicFieldType.info) ...[
+                          TextField(
+                            controller: linkLabel,
+                            decoration: const InputDecoration(
+                              labelText: 'Link label (optional)',
+                            ),
+                          ),
+                          TextField(
+                            controller: linkUrl,
+                            keyboardType: TextInputType.url,
+                            decoration: const InputDecoration(
+                              labelText: 'Link URL (optional)',
+                            ),
+                          ),
+                        ],
                         if (type == DynamicFieldType.singleChoice ||
                             type == DynamicFieldType.multiChoice) ...[
                           const SizedBox(height: 12),
@@ -324,6 +341,16 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
                                   description.text.trim().isEmpty
                                       ? null
                                       : description.text.trim(),
+                              linkLabel:
+                                  type != DynamicFieldType.info ||
+                                          linkLabel.text.trim().isEmpty
+                                      ? null
+                                      : linkLabel.text.trim(),
+                              linkUrl:
+                                  type != DynamicFieldType.info ||
+                                          linkUrl.text.trim().isEmpty
+                                      ? null
+                                      : linkUrl.text.trim(),
                               placeholder:
                                   placeholder.text.trim().isEmpty
                                       ? null
@@ -350,6 +377,8 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
     );
     label.dispose();
     description.dispose();
+    linkLabel.dispose();
+    linkUrl.dispose();
     placeholder.dispose();
     for (final row in allOptionRows) {
       row.dispose();

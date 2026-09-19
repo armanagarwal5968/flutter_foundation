@@ -52,6 +52,8 @@ class DynamicFormField {
     required this.label,
     required this.type,
     this.description,
+    this.linkLabel,
+    this.linkUrl,
     this.placeholder,
     this.required = false,
     this.options = const [],
@@ -64,6 +66,8 @@ class DynamicFormField {
   final String label;
   final DynamicFieldType type;
   final String? description;
+  final String? linkLabel;
+  final String? linkUrl;
   final String? placeholder;
   final bool required;
   final List<DynamicFieldOption> options;
@@ -77,6 +81,8 @@ class DynamicFormField {
         label: json['label'] as String,
         type: DynamicFieldType.fromJson(json['type']),
         description: json['description'] as String?,
+        linkLabel: json['linkLabel'] as String?,
+        linkUrl: json['linkUrl'] as String?,
         placeholder: json['placeholder'] as String?,
         required: json['required'] as bool? ?? false,
         options: (json['options'] as List<dynamic>? ?? const [])
@@ -96,6 +102,8 @@ class DynamicFormField {
     'label': label,
     'type': type.name,
     if (description != null) 'description': description,
+    if (linkLabel != null) 'linkLabel': linkLabel,
+    if (linkUrl != null) 'linkUrl': linkUrl,
     if (placeholder != null) 'placeholder': placeholder,
     'required': required,
     if (options.isNotEmpty)

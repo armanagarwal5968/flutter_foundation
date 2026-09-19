@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'dynamic_form_definition.dart';
 import 'dynamic_form_file_upload.dart';
@@ -205,6 +206,19 @@ class _DynamicFormViewState extends State<DynamicFormView> {
                 if (helper != null) ...[
                   const SizedBox(height: 4),
                   Text(helper),
+                ],
+                if (field.linkLabel != null && field.linkUrl != null) ...[
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    key: ValueKey('dynamic-form-link-${field.id}'),
+                    onPressed:
+                        () => launchUrl(
+                          Uri.parse(field.linkUrl!),
+                          mode: LaunchMode.externalApplication,
+                        ),
+                    icon: const Icon(Icons.open_in_new),
+                    label: Text(field.linkLabel!),
+                  ),
                 ],
               ],
             ),
