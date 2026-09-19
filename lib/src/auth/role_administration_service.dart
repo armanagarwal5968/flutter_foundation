@@ -6,6 +6,7 @@ class RoleAssignment {
     required this.email,
     required this.roles,
     required this.disabled,
+    this.accountType = 'standard',
     this.displayName,
     this.updatedAt,
     this.updatedBy,
@@ -15,6 +16,7 @@ class RoleAssignment {
   final String email;
   final Set<String> roles;
   final bool disabled;
+  final String accountType;
   final String? displayName;
   final DateTime? updatedAt;
   final String? updatedBy;
@@ -26,6 +28,7 @@ class RoleAssignment {
       email: json['email'] as String,
       displayName: json['displayName'] as String?,
       disabled: json['disabled'] as bool? ?? false,
+      accountType: json['accountType'] as String? ?? 'standard',
       roles: Set.unmodifiable(
         (json['roles'] as List<dynamic>? ?? const ['user']).cast<String>(),
       ),

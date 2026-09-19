@@ -130,6 +130,10 @@ class FirebaseAuthenticationService
       id: user.uid,
       email: user.email,
       roles: parseAccountRoles(token.claims),
+      accountType:
+          token.claims?['accountType'] == AccountType.demo
+              ? AccountType.demo
+              : AccountType.standard,
       displayName: user.displayName,
       photoUrl: user.photoURL,
     );
