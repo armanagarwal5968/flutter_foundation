@@ -48,6 +48,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
         }
       }
     }
+    _removeHiddenValues();
   }
 
   @override
@@ -66,11 +67,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
   }.contains(type);
 
   void _continue() {
-    for (final field in _section.fields.where(
-      (field) => _usesController(field.type),
-    )) {
-      _values[field.id] = _controllers[field.id]!.text.trim();
-    }
+    _syncControllerValues();
     setState(() {
       _error = null;
       _sectionIndex++;
@@ -78,9 +75,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
   }
 
   Future<void> _submit() async {
-    for (final controller in _controllers.entries) {
-      _values[controller.key] = controller.value.text.trim();
-    }
+    _syncControllerValues();
     setState(() {
       _submitting = true;
       _error = null;
@@ -95,9 +90,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
   }
 
   Future<void> _reviewAndSubmit() async {
-    for (final controller in _controllers.entries) {
-      _values[controller.key] = controller.value.text.trim();
-    }
+    _syncControllerValues();
     final confirmed = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder:
@@ -116,6 +109,15 @@ class _DynamicFormViewState extends State<DynamicFormView> {
       return const Center(child: Text('This form has no sections.'));
     }
     final isLast = _sectionIndex == widget.definition.sections.length - 1;
+    final visibleFields = _section.fields.where(_isVisible).toList();
+    final questionOffset =
+        widget.definition.sections
+            .take(_sectionIndex)
+            .expand((section) => section.fields)
+            .where(_isVisible)
+            .where((field) => field.type != DynamicFieldType.info)
+            .length;
+    var questionIndex = questionOffset;
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
@@ -136,8 +138,12 @@ class _DynamicFormViewState extends State<DynamicFormView> {
           Text(description),
         ],
         const SizedBox(height: 20),
-        for (final field in _section.fields) ...[
-          _buildField(context, field),
+        for (final field in visibleFields) ...[
+          _buildQuestion(
+            context,
+            field,
+            field.type == DynamicFieldType.info ? null : ++questionIndex,
+          ),
           const SizedBox(height: 16),
         ],
         if (_error case final error?) ...[
@@ -188,6 +194,83 @@ class _DynamicFormViewState extends State<DynamicFormView> {
     );
   }
 
+  bool _isVisible(DynamicFormField field) =>
+      field.visibleWhen?.matches(_values) ?? true;
+
+  void _syncControllerValues() {
+    for (final section in widget.definition.sections) {
+      for (final field in section.fields.where(
+        (field) => _usesController(field.type),
+      )) {
+        if (_isVisible(field)) {
+          _values[field.id] = _controllers[field.id]!.text.trim();
+        } else {
+          _values.remove(field.id);
+        }
+      }
+    }
+    _removeHiddenValues();
+  }
+
+  void _setValue(String fieldId, Object? value) {
+    setState(() {
+      _values[fieldId] = value;
+      _removeHiddenValues();
+    });
+  }
+
+  void _removeHiddenValues() {
+    final fields = widget.definition.sections
+        .expand((section) => section.fields)
+        .toList(growable: false);
+    for (var pass = 0; pass < fields.length; pass++) {
+      var removedAnswer = false;
+      for (final field in fields) {
+        if (_isVisible(field)) continue;
+        removedAnswer = _values.remove(field.id) != null || removedAnswer;
+        final controller = _controllers[field.id];
+        if (controller != null && controller.text.isNotEmpty) {
+          controller.clear();
+          removedAnswer = true;
+        }
+      }
+      if (!removedAnswer) break;
+    }
+  }
+
+  Widget _buildQuestion(
+    BuildContext context,
+    DynamicFormField field,
+    int? questionNumber,
+  ) {
+    final indicator = widget.definition.questionIndicator;
+    if (questionNumber == null || indicator == DynamicQuestionIndicator.none) {
+      return _buildField(context, field);
+    }
+    final marker = switch (indicator) {
+      DynamicQuestionIndicator.none => '',
+      DynamicQuestionIndicator.numbered => '$questionNumber.',
+      DynamicQuestionIndicator.bullet => '•',
+    };
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 32,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(
+              marker,
+              key: ValueKey('question-indicator-${field.id}'),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+        ),
+        Expanded(child: _buildField(context, field)),
+      ],
+    );
+  }
+
   Widget _buildField(BuildContext context, DynamicFormField field) {
     final helper = field.description;
     switch (field.type) {
@@ -230,6 +313,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
       case DynamicFieldType.number:
         return TextFormField(
           controller: _controllers[field.id],
+          onChanged: (value) => _setValue(field.id, value.trim()),
           maxLines: field.type == DynamicFieldType.multiline ? 4 : 1,
           keyboardType: switch (field.type) {
             DynamicFieldType.phone => TextInputType.phone,
@@ -267,7 +351,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
               initialDate: DateTime.tryParse(value ?? '') ?? DateTime.now(),
             );
             if (selected != null) {
-              setState(() => _values[field.id] = selected.toIso8601String());
+              _setValue(field.id, selected.toIso8601String());
             }
           },
         );
@@ -288,8 +372,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
                       ? {_values[field.id]! as bool}
                       : const {},
               onSelectionChanged:
-                  (selection) =>
-                      setState(() => _values[field.id] = selection.first),
+                  (selection) => _setValue(field.id, selection.first),
             ),
           ],
         );
@@ -323,7 +406,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
                       ),
                     ),
                 ],
-                onChanged: (value) => setState(() => _values[field.id] = value),
+                onChanged: (value) => _setValue(field.id, value),
               ),
               if (selectedDescription != null) ...[
                 const SizedBox(height: 6),
@@ -346,7 +429,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
                     option.description == null
                         ? null
                         : Text(option.description!),
-                onChanged: (value) => setState(() => _values[field.id] = value),
+                onChanged: (value) => _setValue(field.id, value),
               ),
           ],
         );
@@ -379,9 +462,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
                   } else {
                     updated.remove(option.value);
                   }
-                  setState(
-                    () => _values[field.id] = updated.toList(growable: false),
-                  );
+                  _setValue(field.id, updated.toList(growable: false));
                 },
               ),
           ],
@@ -438,7 +519,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
               children: [
                 for (var index = 1; index <= (field.maximum ?? 5); index++)
                   IconButton(
-                    onPressed: () => setState(() => _values[field.id] = index),
+                    onPressed: () => _setValue(field.id, index),
                     icon: Icon(
                       index <= rating ? Icons.star : Icons.star_border,
                       color: Colors.amber,
@@ -475,7 +556,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
               .where((item) => item['category'] != category.label)
               .toList() ??
           <Map<String, Object?>>[];
-      setState(() => _values[field.id] = [...existing, upload]);
+      _setValue(field.id, [...existing, upload]);
     } on Object catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {

@@ -9,6 +9,7 @@ List<String> buildDynamicFormSummary(
   final summary = <String>[];
   for (final section in definition.sections) {
     for (final field in section.fields) {
+      if (!(field.visibleWhen?.matches(values) ?? true)) continue;
       final value = values[field.id];
       if (value == null ||
           value == '' ||

@@ -43,6 +43,110 @@ void main() {
     expect(parsed.title, definition.title);
     expect(parsed.sections.length, 2);
     expect(parsed.sections.last.fields.single.type, DynamicFieldType.yesNo);
+    expect(parsed.questionIndicator, DynamicQuestionIndicator.numbered);
+  });
+
+  testWidgets('conditional follow-up appears only for the matching answer', (
+    tester,
+  ) async {
+    Map<String, Object?>? submitted;
+    const conditionalDefinition = DynamicFormDefinition(
+      id: 'conditional',
+      title: 'Conditional form',
+      sections: [
+        DynamicFormSection(
+          id: 'health',
+          title: 'Health',
+          fields: [
+            DynamicFormField(
+              id: 'has_concern',
+              label: 'Do you have a concern?',
+              type: DynamicFieldType.yesNo,
+            ),
+            DynamicFormField(
+              id: 'concern_details',
+              label: 'If yes, add details',
+              type: DynamicFieldType.text,
+              visibleWhen: DynamicFieldCondition(
+                fieldId: 'has_concern',
+                value: true,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    final parsed = DynamicFormDefinition.fromJson(
+      conditionalDefinition.id,
+      conditionalDefinition.toJson(),
+    );
+    expect(
+      parsed.sections.single.fields.last.visibleWhen?.fieldId,
+      'has_concern',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DynamicFormView(
+            definition: conditionalDefinition,
+            onSubmit: (values) async => submitted = values,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('If yes, add details'), findsNothing);
+    await tester.tap(find.text('Yes'));
+    await tester.pump();
+    expect(find.text('If yes, add details'), findsOneWidget);
+    await tester.enterText(find.byType(TextFormField), 'Follow up required');
+    await tester.tap(find.text('No'));
+    await tester.pump();
+    expect(find.text('If yes, add details'), findsNothing);
+    await tester.tap(find.text('Submit'));
+    await tester.pumpAndSettle();
+
+    expect(submitted, {'has_concern': false});
+  });
+
+  testWidgets('question indicators follow form configuration', (tester) async {
+    const bulletDefinition = DynamicFormDefinition(
+      id: 'bullets',
+      title: 'Bulleted form',
+      questionIndicator: DynamicQuestionIndicator.bullet,
+      sections: [
+        DynamicFormSection(
+          id: 'section',
+          title: 'Questions',
+          fields: [
+            DynamicFormField(
+              id: 'first',
+              label: 'First question',
+              type: DynamicFieldType.text,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DynamicFormView(
+            definition: bulletDefinition,
+            onSubmit: (_) async {},
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      find.byKey(const ValueKey('question-indicator-first')),
+      findsOneWidget,
+    );
+    expect(find.text('•'), findsOneWidget);
   });
 
   testWidgets('info fields expose a privacy-policy link', (tester) async {

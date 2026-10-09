@@ -26,6 +26,7 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
   late bool _published;
   late bool _catalogVisible;
   late bool _confirmBeforeSubmit;
+  late DynamicQuestionIndicator _questionIndicator;
   bool _saving = false;
 
   @override
@@ -38,6 +39,7 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
     _published = widget.form.published;
     _catalogVisible = widget.form.catalogVisible;
     _confirmBeforeSubmit = widget.form.confirmBeforeSubmit;
+    _questionIndicator = widget.form.questionIndicator;
   }
 
   @override
@@ -71,6 +73,7 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
         published: _published,
         catalogVisible: _catalogVisible,
         confirmBeforeSubmit: _confirmBeforeSubmit,
+        questionIndicator: _questionIndicator,
         sections: _sections,
       );
 
@@ -150,6 +153,24 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
     final linkLabel = TextEditingController(text: existing?.linkLabel);
     final linkUrl = TextEditingController(text: existing?.linkUrl);
     final placeholder = TextEditingController(text: existing?.placeholder);
+    final orderedFields = _sections
+        .expand((section) => section.fields)
+        .toList(growable: false);
+    final existingIndex =
+        existing == null
+            ? orderedFields.length
+            : orderedFields.indexWhere((field) => field.id == existing.id);
+    final conditionCandidates = orderedFields
+        .take(existingIndex < 0 ? orderedFields.length : existingIndex)
+        .toList(growable: false);
+    var conditionEnabled = existing?.visibleWhen != null;
+    var conditionFieldId = existing?.visibleWhen?.fieldId;
+    var conditionOperator =
+        existing?.visibleWhen?.operator ?? DynamicConditionOperator.equals;
+    Object? conditionValue = existing?.visibleWhen?.value;
+    final conditionValueText = TextEditingController(
+      text: conditionValue?.toString() ?? '',
+    );
     final optionRows = <_EditableOptionRow>[];
     final allOptionRows = <_EditableOptionRow>[];
     for (final option in existing?.options ?? const <DynamicFieldOption>[]) {
@@ -200,6 +221,159 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
                             labelText: 'Placeholder',
                           ),
                         ),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: conditionEnabled,
+                          onChanged:
+                              conditionCandidates.isEmpty
+                                  ? null
+                                  : (value) => setDialogState(
+                                    () => conditionEnabled = value,
+                                  ),
+                          title: const Text('Show conditionally'),
+                          subtitle: const Text(
+                            'Display this field only when another answer matches.',
+                          ),
+                        ),
+                        if (conditionEnabled) ...[
+                          DropdownButtonFormField<String>(
+                            value:
+                                conditionCandidates.any(
+                                      (field) => field.id == conditionFieldId,
+                                    )
+                                    ? conditionFieldId
+                                    : null,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Depends on question',
+                            ),
+                            items: [
+                              for (final candidate in conditionCandidates)
+                                DropdownMenuItem(
+                                  value: candidate.id,
+                                  child: Text(
+                                    candidate.label,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                            ],
+                            onChanged: (value) {
+                              final source = conditionCandidates.firstWhere(
+                                (field) => field.id == value,
+                              );
+                              setDialogState(() {
+                                conditionFieldId = value;
+                                conditionOperator =
+                                    source.type == DynamicFieldType.multiChoice
+                                        ? DynamicConditionOperator.contains
+                                        : DynamicConditionOperator.equals;
+                                conditionValue =
+                                    source.type == DynamicFieldType.yesNo
+                                        ? true
+                                        : source.options.isNotEmpty
+                                        ? source.options.first.value
+                                        : '';
+                                conditionValueText.text =
+                                    conditionValue?.toString() ?? '';
+                              });
+                            },
+                          ),
+                          DropdownButtonFormField<DynamicConditionOperator>(
+                            value: conditionOperator,
+                            decoration: const InputDecoration(
+                              labelText: 'Condition',
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: DynamicConditionOperator.equals,
+                                child: Text('Equals'),
+                              ),
+                              DropdownMenuItem(
+                                value: DynamicConditionOperator.notEquals,
+                                child: Text('Does not equal'),
+                              ),
+                              DropdownMenuItem(
+                                value: DynamicConditionOperator.contains,
+                                child: Text('Contains'),
+                              ),
+                            ],
+                            onChanged:
+                                (value) => setDialogState(
+                                  () =>
+                                      conditionOperator =
+                                          value ??
+                                          DynamicConditionOperator.equals,
+                                ),
+                          ),
+                          if (_fieldWithId(
+                                conditionCandidates,
+                                conditionFieldId,
+                              )
+                              case final source?)
+                            if (source.type == DynamicFieldType.yesNo)
+                              DropdownButtonFormField<bool>(
+                                value:
+                                    conditionValue is bool
+                                        ? conditionValue as bool
+                                        : null,
+                                decoration: const InputDecoration(
+                                  labelText: 'Expected answer',
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: true,
+                                    child: Text('Yes'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: false,
+                                    child: Text('No'),
+                                  ),
+                                ],
+                                onChanged:
+                                    (value) => setDialogState(
+                                      () => conditionValue = value,
+                                    ),
+                              )
+                            else if (source.options.isNotEmpty)
+                              DropdownButtonFormField<String>(
+                                value:
+                                    source.options.any(
+                                          (option) =>
+                                              option.value == conditionValue,
+                                        )
+                                        ? conditionValue as String?
+                                        : null,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'Expected answer',
+                                ),
+                                items: [
+                                  for (final option in source.options)
+                                    DropdownMenuItem(
+                                      value: option.value,
+                                      child: Text(
+                                        option.label,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                ],
+                                onChanged:
+                                    (value) => setDialogState(
+                                      () => conditionValue = value,
+                                    ),
+                              )
+                            else
+                              TextField(
+                                controller: conditionValueText,
+                                decoration: const InputDecoration(
+                                  labelText: 'Expected value',
+                                ),
+                                onChanged:
+                                    (value) => setDialogState(
+                                      () => conditionValue = value,
+                                    ),
+                              ),
+                        ],
                         if (type == DynamicFieldType.info) ...[
                           TextField(
                             controller: linkLabel,
@@ -361,6 +535,16 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
                               maximum:
                                   type == DynamicFieldType.rating ? 5 : null,
                               includeInSummary: includeInSummary,
+                              visibleWhen:
+                                  conditionEnabled &&
+                                          conditionFieldId != null &&
+                                          conditionValue != null
+                                      ? DynamicFieldCondition(
+                                        fieldId: conditionFieldId!,
+                                        operator: conditionOperator,
+                                        value: conditionValue,
+                                      )
+                                      : null,
                               options: optionRows
                                   .where(
                                     (row) => row.label.text.trim().isNotEmpty,
@@ -380,10 +564,18 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
     linkLabel.dispose();
     linkUrl.dispose();
     placeholder.dispose();
+    conditionValueText.dispose();
     for (final row in allOptionRows) {
       row.dispose();
     }
     return result;
+  }
+
+  DynamicFormField? _fieldWithId(List<DynamicFormField> fields, String? id) {
+    for (final field in fields) {
+      if (field.id == id) return field;
+    }
+    return null;
   }
 
   @override
@@ -417,6 +609,30 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
           TextField(
             controller: _submitLabel,
             decoration: const InputDecoration(labelText: 'Submit button'),
+          ),
+          DropdownButtonFormField<DynamicQuestionIndicator>(
+            value: _questionIndicator,
+            decoration: const InputDecoration(labelText: 'Question markers'),
+            items: const [
+              DropdownMenuItem(
+                value: DynamicQuestionIndicator.numbered,
+                child: Text('Numbered (1, 2, 3...)'),
+              ),
+              DropdownMenuItem(
+                value: DynamicQuestionIndicator.bullet,
+                child: Text('Bullets'),
+              ),
+              DropdownMenuItem(
+                value: DynamicQuestionIndicator.none,
+                child: Text('None'),
+              ),
+            ],
+            onChanged:
+                (value) => setState(
+                  () =>
+                      _questionIndicator =
+                          value ?? DynamicQuestionIndicator.numbered,
+                ),
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
@@ -465,7 +681,8 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
                         _sections[sectionIndex].fields[fieldIndex].label,
                       ),
                       subtitle: Text(
-                        _sections[sectionIndex].fields[fieldIndex].type.name,
+                        '${_sections[sectionIndex].fields[fieldIndex].type.name}'
+                        '${_sections[sectionIndex].fields[fieldIndex].visibleWhen == null ? '' : ' • conditional'}',
                       ),
                       onTap: () async {
                         final updated = await _fieldDialog(

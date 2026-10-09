@@ -17,6 +17,63 @@ enum DynamicFieldType {
   );
 }
 
+enum DynamicQuestionIndicator {
+  none,
+  numbered,
+  bullet;
+
+  static DynamicQuestionIndicator fromJson(Object? value) => values.firstWhere(
+    (indicator) => indicator.name == value,
+    orElse: () => DynamicQuestionIndicator.numbered,
+  );
+}
+
+enum DynamicConditionOperator {
+  equals,
+  notEquals,
+  contains;
+
+  static DynamicConditionOperator fromJson(Object? value) => values.firstWhere(
+    (operator) => operator.name == value,
+    orElse: () => DynamicConditionOperator.equals,
+  );
+}
+
+class DynamicFieldCondition {
+  const DynamicFieldCondition({
+    required this.fieldId,
+    required this.value,
+    this.operator = DynamicConditionOperator.equals,
+  });
+
+  final String fieldId;
+  final Object? value;
+  final DynamicConditionOperator operator;
+
+  factory DynamicFieldCondition.fromJson(Map<String, dynamic> json) =>
+      DynamicFieldCondition(
+        fieldId: json['fieldId'] as String,
+        value: json['value'],
+        operator: DynamicConditionOperator.fromJson(json['operator']),
+      );
+
+  bool matches(Map<String, Object?> values) {
+    final actual = values[fieldId];
+    return switch (operator) {
+      DynamicConditionOperator.equals => actual == value,
+      DynamicConditionOperator.notEquals => actual != value,
+      DynamicConditionOperator.contains =>
+        actual is Iterable && actual.contains(value),
+    };
+  }
+
+  Map<String, dynamic> toJson() => {
+    'fieldId': fieldId,
+    'operator': operator.name,
+    'value': value,
+  };
+}
+
 class DynamicFieldOption {
   const DynamicFieldOption({
     required this.value,
@@ -60,6 +117,7 @@ class DynamicFormField {
     this.minimum,
     this.maximum,
     this.includeInSummary = false,
+    this.visibleWhen,
   });
 
   final String id;
@@ -74,6 +132,7 @@ class DynamicFormField {
   final num? minimum;
   final num? maximum;
   final bool includeInSummary;
+  final DynamicFieldCondition? visibleWhen;
 
   factory DynamicFormField.fromJson(Map<String, dynamic> json) =>
       DynamicFormField(
@@ -95,6 +154,12 @@ class DynamicFormField {
         minimum: json['minimum'] as num?,
         maximum: json['maximum'] as num?,
         includeInSummary: json['includeInSummary'] as bool? ?? false,
+        visibleWhen:
+            json['visibleWhen'] is Map
+                ? DynamicFieldCondition.fromJson(
+                  Map<String, dynamic>.from(json['visibleWhen'] as Map),
+                )
+                : null,
       );
 
   Map<String, dynamic> toJson() => {
@@ -111,6 +176,7 @@ class DynamicFormField {
     if (minimum != null) 'minimum': minimum,
     if (maximum != null) 'maximum': maximum,
     'includeInSummary': includeInSummary,
+    if (visibleWhen != null) 'visibleWhen': visibleWhen!.toJson(),
   };
 }
 
@@ -160,6 +226,7 @@ class DynamicFormDefinition {
     this.published = true,
     this.catalogVisible = true,
     this.confirmBeforeSubmit = false,
+    this.questionIndicator = DynamicQuestionIndicator.numbered,
   });
 
   final String id;
@@ -170,6 +237,7 @@ class DynamicFormDefinition {
   final bool published;
   final bool catalogVisible;
   final bool confirmBeforeSubmit;
+  final DynamicQuestionIndicator questionIndicator;
   final List<DynamicFormSection> sections;
 
   factory DynamicFormDefinition.fromJson(
@@ -184,6 +252,9 @@ class DynamicFormDefinition {
     published: json['published'] as bool? ?? false,
     catalogVisible: json['catalogVisible'] as bool? ?? true,
     confirmBeforeSubmit: json['confirmBeforeSubmit'] as bool? ?? false,
+    questionIndicator: DynamicQuestionIndicator.fromJson(
+      json['questionIndicator'],
+    ),
     sections: (json['sections'] as List<dynamic>? ?? const [])
         .map(
           (section) => DynamicFormSection.fromJson(
@@ -201,6 +272,7 @@ class DynamicFormDefinition {
     'published': published,
     'catalogVisible': catalogVisible,
     'confirmBeforeSubmit': confirmBeforeSubmit,
+    'questionIndicator': questionIndicator.name,
     'sections': sections.map((section) => section.toJson()).toList(),
   };
 }
