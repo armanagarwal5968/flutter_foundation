@@ -46,6 +46,12 @@ class _DynamicFormViewState extends State<DynamicFormView> {
             text: widget.initialValues[field.id]?.toString() ?? '',
           );
         }
+        if (_hasOtherOption(field)) {
+          final detailsKey = _otherDetailsKey(field);
+          _controllers[detailsKey] = TextEditingController(
+            text: widget.initialValues[detailsKey]?.toString() ?? '',
+          );
+        }
       }
     }
     _removeHiddenValues();
@@ -209,6 +215,16 @@ class _DynamicFormViewState extends State<DynamicFormView> {
         }
       }
     }
+    for (final section in widget.definition.sections) {
+      for (final field in section.fields.where(_hasOtherOption)) {
+        final detailsKey = _otherDetailsKey(field);
+        if (_isVisible(field) && _hasSelectedOtherOption(field)) {
+          _values[detailsKey] = _controllers[detailsKey]!.text.trim();
+        } else {
+          _values.remove(detailsKey);
+        }
+      }
+    }
     _removeHiddenValues();
   }
 
@@ -236,6 +252,64 @@ class _DynamicFormViewState extends State<DynamicFormView> {
       }
       if (!removedAnswer) break;
     }
+    for (final field in fields.where(_hasOtherOption)) {
+      if (_isVisible(field) && _hasSelectedOtherOption(field)) continue;
+      final detailsKey = _otherDetailsKey(field);
+      _values.remove(detailsKey);
+      _controllers[detailsKey]?.clear();
+    }
+  }
+
+  bool _hasOtherOption(DynamicFormField field) =>
+      (field.type == DynamicFieldType.singleChoice ||
+          field.type == DynamicFieldType.multiChoice) &&
+      field.options.any(_optionNeedsDetails);
+
+  bool _optionNeedsDetails(DynamicFieldOption option) {
+    final label = option.label.toLowerCase();
+    final value = option.value.toLowerCase().replaceAll('_', ' ');
+    final other = RegExp(r'\bother\b');
+    return other.hasMatch(label) ||
+        other.hasMatch(value) ||
+        label.contains('something else');
+  }
+
+  String _otherDetailsKey(DynamicFormField field) =>
+      '${field.id}_other_details';
+
+  bool _hasSelectedOtherOption(DynamicFormField field) {
+    final selected = _values[field.id];
+    if (selected is String) {
+      return field.options.any(
+        (option) => option.value == selected && _optionNeedsDetails(option),
+      );
+    }
+    if (selected is Iterable) {
+      final selectedValues = selected.whereType<String>().toSet();
+      return field.options.any(
+        (option) =>
+            selectedValues.contains(option.value) &&
+            _optionNeedsDetails(option),
+      );
+    }
+    return false;
+  }
+
+  List<Widget> _otherDetailsInput(DynamicFormField field) {
+    if (!_hasSelectedOtherOption(field)) return const [];
+    final detailsKey = _otherDetailsKey(field);
+    return [
+      const SizedBox(height: 8),
+      TextFormField(
+        key: ValueKey('other-details-${field.id}'),
+        controller: _controllers[detailsKey],
+        onChanged: (value) => _setValue(detailsKey, value.trim()),
+        decoration: const InputDecoration(
+          labelText: 'Please specify',
+          border: OutlineInputBorder(),
+        ),
+      ),
+    ];
   }
 
   Widget _buildQuestion(
@@ -412,6 +486,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
                 const SizedBox(height: 6),
                 Text(selectedDescription),
               ],
+              ..._otherDetailsInput(field),
             ],
           );
         }
@@ -431,6 +506,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
                         : Text(option.description!),
                 onChanged: (value) => _setValue(field.id, value),
               ),
+            ..._otherDetailsInput(field),
           ],
         );
       case DynamicFieldType.multiChoice:
@@ -465,6 +541,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
                   _setValue(field.id, updated.toList(growable: false));
                 },
               ),
+            ..._otherDetailsInput(field),
           ],
         );
       case DynamicFieldType.fileUpload:
@@ -612,7 +689,7 @@ class DynamicFormConfirmationPage extends StatelessWidget {
             if (_hasReviewValue(entry.value))
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text(fields[entry.key]?.label ?? entry.key),
+                title: Text(_reviewLabel(fields, entry.key)),
                 subtitle: Text(_reviewValue(fields[entry.key], entry.value)),
               ),
           const SizedBox(height: 20),
@@ -630,6 +707,17 @@ class DynamicFormConfirmationPage extends StatelessWidget {
       ),
     );
   }
+}
+
+String _reviewLabel(Map<String, DynamicFormField> fields, String key) {
+  final field = fields[key];
+  if (field != null) return field.label;
+  const suffix = '_other_details';
+  if (key.endsWith(suffix)) {
+    final source = fields[key.substring(0, key.length - suffix.length)];
+    if (source != null) return '${source.label} — Other details';
+  }
+  return key;
 }
 
 bool _hasReviewValue(Object? value) =>

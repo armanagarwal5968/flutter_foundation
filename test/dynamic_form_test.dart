@@ -149,6 +149,112 @@ void main() {
     expect(find.text('•'), findsOneWidget);
   });
 
+  testWidgets('Other choices reveal and submit a details text box', (
+    tester,
+  ) async {
+    Map<String, Object?>? submitted;
+    const otherDefinition = DynamicFormDefinition(
+      id: 'other_choice',
+      title: 'Other choice',
+      sections: [
+        DynamicFormSection(
+          id: 'profile',
+          title: 'Profile',
+          fields: [
+            DynamicFormField(
+              id: 'preferred_language',
+              label: 'Preferred language',
+              type: DynamicFieldType.singleChoice,
+              options: [
+                DynamicFieldOption(value: 'english', label: 'English'),
+                DynamicFieldOption(value: 'other', label: 'Other (Specify)'),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DynamicFormView(
+            definition: otherDefinition,
+            onSubmit: (values) async => submitted = values,
+          ),
+        ),
+      ),
+    );
+
+    const detailsKey = ValueKey('other-details-preferred_language');
+    expect(find.byKey(detailsKey), findsNothing);
+    await tester.tap(find.text('Other (Specify)'));
+    await tester.pump();
+    expect(find.byKey(detailsKey), findsOneWidget);
+    await tester.enterText(find.byKey(detailsKey), 'Kannada');
+    await tester.tap(find.text('Submit'));
+    await tester.pumpAndSettle();
+
+    expect(submitted, {
+      'preferred_language': 'other',
+      'preferred_language_other_details': 'Kannada',
+    });
+  });
+
+  testWidgets('Other details are removed when the option is deselected', (
+    tester,
+  ) async {
+    Map<String, Object?>? submitted;
+    const otherDefinition = DynamicFormDefinition(
+      id: 'other_multi_choice',
+      title: 'Other multi choice',
+      sections: [
+        DynamicFormSection(
+          id: 'history',
+          title: 'History',
+          fields: [
+            DynamicFormField(
+              id: 'conditions',
+              label: 'Conditions',
+              type: DynamicFieldType.multiChoice,
+              options: [
+                DynamicFieldOption(value: 'none', label: 'None'),
+                DynamicFieldOption(
+                  value: 'other_condition',
+                  label: 'Other condition',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DynamicFormView(
+            definition: otherDefinition,
+            onSubmit: (values) async => submitted = values,
+          ),
+        ),
+      ),
+    );
+
+    const detailsKey = ValueKey('other-details-conditions');
+    await tester.tap(find.text('Other condition'));
+    await tester.pump();
+    await tester.enterText(find.byKey(detailsKey), 'A specified condition');
+    await tester.tap(find.text('Other condition'));
+    await tester.pump();
+    expect(find.byKey(detailsKey), findsNothing);
+    await tester.tap(find.text('Submit'));
+    await tester.pumpAndSettle();
+
+    expect(submitted?['conditions'], isEmpty);
+    expect(submitted, isNot(contains('conditions_other_details')));
+  });
+
   testWidgets('info fields expose a privacy-policy link', (tester) async {
     const linkedDefinition = DynamicFormDefinition(
       id: 'linked_info',
