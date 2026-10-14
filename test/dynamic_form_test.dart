@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:alramwarnaga_foundation/alramwarnaga_foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -656,5 +658,50 @@ void main() {
     final upload = Map<String, Object?>.from(uploads.single! as Map);
     expect(upload['category'], 'CBC report');
     expect(upload['fileName'], 'file.pdf');
+  });
+
+  testWidgets('blocks the form with progress feedback while submitting', (
+    tester,
+  ) async {
+    final submission = Completer<void>();
+    const singleSection = DynamicFormDefinition(
+      id: 'progress',
+      title: 'Progress form',
+      sections: [
+        DynamicFormSection(
+          id: 'details',
+          title: 'Details',
+          fields: [
+            DynamicFormField(
+              id: 'notes',
+              label: 'Notes',
+              type: DynamicFieldType.text,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DynamicFormView(
+            definition: singleSection,
+            onSubmit: (_) => submission.future,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Submit'));
+    await tester.pump();
+
+    expect(find.byKey(const Key('blocking-progress-barrier')), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('Submitting form…'), findsOneWidget);
+
+    submission.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('Submitting form…'), findsNothing);
   });
 }

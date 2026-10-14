@@ -5,6 +5,7 @@ import 'dynamic_form_definition.dart';
 import 'dynamic_form_file_upload.dart';
 import 'dynamic_form_summary.dart';
 import '../formatting/friendly_date.dart';
+import '../widgets/blocking_progress_overlay.dart';
 
 typedef DynamicFormSubmit = Future<void> Function(Map<String, Object?> values);
 
@@ -12,6 +13,7 @@ class DynamicFormView extends StatefulWidget {
   const DynamicFormView({
     required this.definition,
     required this.onSubmit,
+    this.onSubmitted,
     this.initialValues = const {},
     this.fileUploader,
     super.key,
@@ -19,6 +21,7 @@ class DynamicFormView extends StatefulWidget {
 
   final DynamicFormDefinition definition;
   final DynamicFormSubmit onSubmit;
+  final Future<void> Function()? onSubmitted;
   final Map<String, Object?> initialValues;
   final DynamicFormFileUploader? fileUploader;
 
@@ -86,13 +89,16 @@ class _DynamicFormViewState extends State<DynamicFormView> {
       _submitting = true;
       _error = null;
     });
+    var submitted = false;
     try {
       await widget.onSubmit(Map.unmodifiable(_values));
+      submitted = true;
     } on Object catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+    if (submitted && mounted) await widget.onSubmitted?.call();
   }
 
   Future<void> _reviewAndSubmit() async {
@@ -124,79 +130,86 @@ class _DynamicFormViewState extends State<DynamicFormView> {
             .where((field) => field.type != DynamicFieldType.info)
             .length;
     var questionIndex = questionOffset;
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        if (widget.definition.sections.length > 1) ...[
-          LinearProgressIndicator(
-            value: (_sectionIndex + 1) / widget.definition.sections.length,
-          ),
+    return BlockingProgressOverlay(
+      visible: _submitting,
+      message: 'Submitting form…',
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          if (widget.definition.sections.length > 1) ...[
+            LinearProgressIndicator(
+              value: (_sectionIndex + 1) / widget.definition.sections.length,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Step ${_sectionIndex + 1} of ${widget.definition.sections.length}',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+          ],
           const SizedBox(height: 12),
           Text(
-            'Step ${_sectionIndex + 1} of ${widget.definition.sections.length}',
-            style: Theme.of(context).textTheme.labelLarge,
+            _section.title,
+            style: Theme.of(context).textTheme.headlineSmall,
           ),
-        ],
-        const SizedBox(height: 12),
-        Text(_section.title, style: Theme.of(context).textTheme.headlineSmall),
-        if (_section.description case final description?) ...[
-          const SizedBox(height: 8),
-          Text(description),
-        ],
-        const SizedBox(height: 20),
-        for (final field in visibleFields) ...[
-          _buildQuestion(
-            context,
-            field,
-            field.type == DynamicFieldType.info ? null : ++questionIndex,
-          ),
-          const SizedBox(height: 16),
-        ],
-        if (_error case final error?) ...[
-          Text(
-            error,
-            key: const Key('dynamic-form-error'),
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
-          const SizedBox(height: 12),
-        ],
-        Row(
-          children: [
-            if (_sectionIndex > 0)
+          if (_section.description case final description?) ...[
+            const SizedBox(height: 8),
+            Text(description),
+          ],
+          const SizedBox(height: 20),
+          for (final field in visibleFields) ...[
+            _buildQuestion(
+              context,
+              field,
+              field.type == DynamicFieldType.info ? null : ++questionIndex,
+            ),
+            const SizedBox(height: 16),
+          ],
+          if (_error case final error?) ...[
+            Text(
+              error,
+              key: const Key('dynamic-form-error'),
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+            const SizedBox(height: 12),
+          ],
+          Row(
+            children: [
+              if (_sectionIndex > 0)
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed:
+                        _submitting
+                            ? null
+                            : () => setState(() => _sectionIndex--),
+                    child: const Text('Back'),
+                  ),
+                ),
+              if (_sectionIndex > 0) const SizedBox(width: 12),
               Expanded(
-                child: OutlinedButton(
+                child: FilledButton(
                   onPressed:
                       _submitting
                           ? null
-                          : () => setState(() => _sectionIndex--),
-                  child: const Text('Back'),
-                ),
-              ),
-            if (_sectionIndex > 0) const SizedBox(width: 12),
-            Expanded(
-              child: FilledButton(
-                onPressed:
+                          : isLast
+                          ? (widget.definition.confirmBeforeSubmit
+                              ? _reviewAndSubmit
+                              : _submit)
+                          : _continue,
+                  child: Text(
                     _submitting
-                        ? null
+                        ? 'Submitting...'
                         : isLast
                         ? (widget.definition.confirmBeforeSubmit
-                            ? _reviewAndSubmit
-                            : _submit)
-                        : _continue,
-                child: Text(
-                  _submitting
-                      ? 'Submitting...'
-                      : isLast
-                      ? (widget.definition.confirmBeforeSubmit
-                          ? 'Review answers'
-                          : widget.definition.submitLabel)
-                      : 'Continue',
+                            ? 'Review answers'
+                            : widget.definition.submitLabel)
+                        : 'Continue',
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
-      ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 
