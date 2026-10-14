@@ -363,7 +363,15 @@ class _DynamicFormViewState extends State<DynamicFormView> {
     switch (field.type) {
       case DynamicFieldType.info:
         return Card(
-          color: Theme.of(context).colorScheme.primaryContainer,
+          key: ValueKey('dynamic-form-info-${field.id}'),
+          color: Theme.of(context).colorScheme.surfaceContainerLowest,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(

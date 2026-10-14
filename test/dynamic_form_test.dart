@@ -258,6 +258,8 @@ void main() {
   });
 
   testWidgets('info fields expose a privacy-policy link', (tester) async {
+    const neutralSurface = Color(0xffedeee5);
+    const greenSectionColor = Color(0xff01a246);
     const linkedDefinition = DynamicFormDefinition(
       id: 'linked_info',
       title: 'Consent',
@@ -289,6 +291,12 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: ThemeData(
+          colorScheme: const ColorScheme.light(
+            primaryContainer: greenSectionColor,
+            surfaceContainerLowest: neutralSurface,
+          ),
+        ),
         home: Scaffold(
           body: DynamicFormView(
             definition: linkedDefinition,
@@ -303,6 +311,11 @@ void main() {
       find.byKey(const ValueKey('dynamic-form-link-privacy')),
       findsOneWidget,
     );
+    final infoCard = tester.widget<Card>(
+      find.byKey(const ValueKey('dynamic-form-info-privacy')),
+    );
+    expect(infoCard.color, neutralSurface);
+    expect(infoCard.color, isNot(greenSectionColor));
   });
 
   test('summary includes marked choices and only Yes red flags', () {
