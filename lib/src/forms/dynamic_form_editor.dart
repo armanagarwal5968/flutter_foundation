@@ -4,6 +4,8 @@ import 'dynamic_form_definition.dart';
 import 'dynamic_form_preview.dart';
 import 'dynamic_form_repository.dart';
 
+enum _EditorItemAction { moveUp, moveDown, edit, delete }
+
 class DynamicFormEditorPage extends StatefulWidget {
   const DynamicFormEditorPage({
     required this.form,
@@ -93,6 +95,44 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
     if (section != null) setState(() => _sections.add(section));
   }
 
+  Future<void> _editSection(int sectionIndex) async {
+    final section = await _sectionDialog(_sections[sectionIndex]);
+    if (section != null) {
+      setState(() => _sections[sectionIndex] = section);
+    }
+  }
+
+  void _moveSection(int sectionIndex, int offset) {
+    final destination = sectionIndex + offset;
+    if (destination < 0 || destination >= _sections.length) return;
+    setState(() {
+      final section = _sections.removeAt(sectionIndex);
+      _sections.insert(destination, section);
+    });
+  }
+
+  void _moveField(int sectionIndex, int fieldIndex, int offset) {
+    final fields = List<DynamicFormField>.of(_sections[sectionIndex].fields);
+    final destination = fieldIndex + offset;
+    if (destination < 0 || destination >= fields.length) return;
+    final field = fields.removeAt(fieldIndex);
+    fields.insert(destination, field);
+    _replaceSectionFields(sectionIndex, fields);
+  }
+
+  void _replaceSectionFields(int sectionIndex, List<DynamicFormField> fields) {
+    final section = _sections[sectionIndex];
+    setState(
+      () =>
+          _sections[sectionIndex] = DynamicFormSection(
+            id: section.id,
+            title: section.title,
+            description: section.description,
+            fields: fields,
+          ),
+    );
+  }
+
   Future<DynamicFormSection?> _sectionDialog([
     DynamicFormSection? existing,
   ]) async {
@@ -107,6 +147,7 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
+                  key: const Key('section-title-editor'),
                   controller: title,
                   decoration: const InputDecoration(labelText: 'Title'),
                 ),
@@ -142,6 +183,7 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
             ],
           ),
     );
+    await Future<void>.delayed(kThemeAnimationDuration);
     title.dispose();
     description.dispose();
     return result;
@@ -559,6 +601,7 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
                 ),
           ),
     );
+    await Future<void>.delayed(kThemeAnimationDuration);
     label.dispose();
     description.dispose();
     linkLabel.dispose();
@@ -664,11 +707,42 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
                 subtitle: Text(
                   '${_sections[sectionIndex].fields.length} fields',
                 ),
-                trailing: IconButton(
-                  tooltip: 'Delete section',
-                  onPressed:
-                      () => setState(() => _sections.removeAt(sectionIndex)),
-                  icon: const Icon(Icons.delete_outline),
+                trailing: PopupMenuButton<_EditorItemAction>(
+                  key: ValueKey('section-menu-${_sections[sectionIndex].id}'),
+                  tooltip: 'Section actions',
+                  onSelected: (action) {
+                    switch (action) {
+                      case _EditorItemAction.moveUp:
+                        _moveSection(sectionIndex, -1);
+                      case _EditorItemAction.moveDown:
+                        _moveSection(sectionIndex, 1);
+                      case _EditorItemAction.edit:
+                        _editSection(sectionIndex);
+                      case _EditorItemAction.delete:
+                        setState(() => _sections.removeAt(sectionIndex));
+                    }
+                  },
+                  itemBuilder:
+                      (context) => [
+                        PopupMenuItem(
+                          value: _EditorItemAction.moveUp,
+                          enabled: sectionIndex > 0,
+                          child: const Text('Move section up'),
+                        ),
+                        PopupMenuItem(
+                          value: _EditorItemAction.moveDown,
+                          enabled: sectionIndex < _sections.length - 1,
+                          child: const Text('Move section down'),
+                        ),
+                        const PopupMenuItem(
+                          value: _EditorItemAction.edit,
+                          child: Text('Edit section title'),
+                        ),
+                        const PopupMenuItem(
+                          value: _EditorItemAction.delete,
+                          child: Text('Delete section'),
+                        ),
+                      ],
                 ),
                 children: [
                   for (
@@ -703,23 +777,56 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
                               ),
                         );
                       },
-                      trailing: IconButton(
-                        onPressed: () {
-                          final fields = List<DynamicFormField>.of(
-                            _sections[sectionIndex].fields,
-                          )..removeAt(fieldIndex);
-                          setState(
-                            () =>
-                                _sections[sectionIndex] = DynamicFormSection(
-                                  id: _sections[sectionIndex].id,
-                                  title: _sections[sectionIndex].title,
-                                  description:
-                                      _sections[sectionIndex].description,
-                                  fields: fields,
-                                ),
-                          );
+                      trailing: PopupMenuButton<_EditorItemAction>(
+                        key: ValueKey(
+                          'field-menu-${_sections[sectionIndex].id}-${_sections[sectionIndex].fields[fieldIndex].id}',
+                        ),
+                        tooltip: 'Field actions',
+                        onSelected: (action) async {
+                          switch (action) {
+                            case _EditorItemAction.moveUp:
+                              _moveField(sectionIndex, fieldIndex, -1);
+                            case _EditorItemAction.moveDown:
+                              _moveField(sectionIndex, fieldIndex, 1);
+                            case _EditorItemAction.edit:
+                              final updated = await _fieldDialog(
+                                _sections[sectionIndex].fields[fieldIndex],
+                              );
+                              if (updated == null) return;
+                              final fields = List<DynamicFormField>.of(
+                                _sections[sectionIndex].fields,
+                              )..[fieldIndex] = updated;
+                              _replaceSectionFields(sectionIndex, fields);
+                            case _EditorItemAction.delete:
+                              final fields = List<DynamicFormField>.of(
+                                _sections[sectionIndex].fields,
+                              )..removeAt(fieldIndex);
+                              _replaceSectionFields(sectionIndex, fields);
+                          }
                         },
-                        icon: const Icon(Icons.delete_outline),
+                        itemBuilder:
+                            (context) => [
+                              PopupMenuItem(
+                                value: _EditorItemAction.moveUp,
+                                enabled: fieldIndex > 0,
+                                child: const Text('Move field up'),
+                              ),
+                              PopupMenuItem(
+                                value: _EditorItemAction.moveDown,
+                                enabled:
+                                    fieldIndex <
+                                    _sections[sectionIndex].fields.length - 1,
+                                child: const Text('Move field down'),
+                              ),
+                              const PopupMenuItem(
+                                value: _EditorItemAction.edit,
+                                child: Text('Edit field'),
+                              ),
+                              const PopupMenuItem(
+                                value: _EditorItemAction.delete,
+                                child: Text('Delete field'),
+                              ),
+                            ],
                       ),
                     ),
                   ListTile(
@@ -728,18 +835,10 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
                     onTap: () async {
                       final field = await _fieldDialog();
                       if (field == null) return;
-                      setState(
-                        () =>
-                            _sections[sectionIndex] = DynamicFormSection(
-                              id: _sections[sectionIndex].id,
-                              title: _sections[sectionIndex].title,
-                              description: _sections[sectionIndex].description,
-                              fields: [
-                                ..._sections[sectionIndex].fields,
-                                field,
-                              ],
-                            ),
-                      );
+                      _replaceSectionFields(sectionIndex, [
+                        ..._sections[sectionIndex].fields,
+                        field,
+                      ]);
                     },
                   ),
                 ],

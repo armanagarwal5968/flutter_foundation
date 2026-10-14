@@ -704,4 +704,107 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Submitting form…'), findsNothing);
   });
+
+  testWidgets('editor renames and reorders sections and fields', (
+    tester,
+  ) async {
+    final repository = _EditingFormRepository();
+    const editable = DynamicFormDefinition(
+      id: 'editable',
+      title: 'Editable form',
+      sections: [
+        DynamicFormSection(
+          id: 'first',
+          title: 'First section',
+          fields: [
+            DynamicFormField(
+              id: 'first_field',
+              label: 'First field',
+              type: DynamicFieldType.text,
+            ),
+            DynamicFormField(
+              id: 'second_field',
+              label: 'Second field',
+              type: DynamicFieldType.text,
+            ),
+          ],
+        ),
+        DynamicFormSection(id: 'second', title: 'Second section', fields: []),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DynamicFormEditorPage(form: editable, repository: repository),
+      ),
+    );
+
+    await tester.ensureVisible(find.text('First section'));
+    await tester.tap(find.text('First section'));
+    await tester.pumpAndSettle();
+    final secondFieldMenu = find.byKey(
+      const Key('field-menu-first-second_field'),
+    );
+    await tester.ensureVisible(secondFieldMenu);
+    await tester.tap(secondFieldMenu);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Move field up'));
+    await tester.pumpAndSettle();
+
+    final firstSectionMenu = find.byKey(const Key('section-menu-first'));
+    await tester.ensureVisible(firstSectionMenu);
+    await tester.tap(firstSectionMenu);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit section title'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('section-title-editor')),
+      'Updated section',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    final secondSectionMenu = find.byKey(const Key('section-menu-second'));
+    await tester.ensureVisible(secondSectionMenu);
+    await tester.tap(secondSectionMenu);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Move section up'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(TextButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    final saved = repository.saved!;
+    expect(saved.sections.map((section) => section.id), ['second', 'first']);
+    expect(saved.sections.last.title, 'Updated section');
+    expect(saved.sections.last.fields.map((field) => field.id), [
+      'second_field',
+      'first_field',
+    ]);
+  });
+}
+
+class _EditingFormRepository implements DynamicFormRepository {
+  DynamicFormDefinition? saved;
+
+  @override
+  Future<void> saveForm(DynamicFormDefinition form) async => saved = form;
+
+  @override
+  Future<void> submit({
+    required String formId,
+    required String userId,
+    required int formVersion,
+    required Map<String, Object?> values,
+    Map<String, Object?> context = const {},
+  }) async {}
+
+  @override
+  Stream<DynamicFormDefinition?> watchForm(String formId) =>
+      Stream.value(saved);
+
+  @override
+  Stream<List<DynamicFormDefinition>> watchForms({
+    bool includeDrafts = false,
+  }) => Stream.value(saved == null ? const [] : [saved!]);
 }
