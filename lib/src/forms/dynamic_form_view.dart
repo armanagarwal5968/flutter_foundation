@@ -32,6 +32,7 @@ class DynamicFormView extends StatefulWidget {
 class _DynamicFormViewState extends State<DynamicFormView> {
   final _values = <String, Object?>{};
   final _controllers = <String, TextEditingController>{};
+  final _scrollController = ScrollController();
   int _sectionIndex = 0;
   bool _submitting = false;
   String? _error;
@@ -62,6 +63,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     for (final controller in _controllers.values) {
       controller.dispose();
     }
@@ -77,9 +79,18 @@ class _DynamicFormViewState extends State<DynamicFormView> {
 
   void _continue() {
     _syncControllerValues();
+    _showSection(_sectionIndex + 1);
+  }
+
+  void _showSection(int index) {
     setState(() {
       _error = null;
-      _sectionIndex++;
+      _sectionIndex = index;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _scrollController.hasClients) {
+        _scrollController.jumpTo(0);
+      }
     });
   }
 
@@ -134,6 +145,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
       visible: _submitting,
       message: 'Submitting form…',
       child: ListView(
+        controller: _scrollController,
         padding: const EdgeInsets.all(20),
         children: [
           if (widget.definition.sections.length > 1) ...[
@@ -180,7 +192,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
                     onPressed:
                         _submitting
                             ? null
-                            : () => setState(() => _sectionIndex--),
+                            : () => _showSection(_sectionIndex - 1),
                     child: const Text('Back'),
                   ),
                 ),
@@ -313,17 +325,38 @@ class _DynamicFormViewState extends State<DynamicFormView> {
     final detailsKey = _otherDetailsKey(field);
     return [
       const SizedBox(height: 8),
-      TextFormField(
-        key: ValueKey('other-details-${field.id}'),
-        controller: _controllers[detailsKey],
-        onChanged: (value) => _setValue(detailsKey, value.trim()),
-        decoration: const InputDecoration(
-          labelText: 'Please specify',
-          border: OutlineInputBorder(),
-        ),
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Please specify'),
+          const SizedBox(height: 8),
+          TextFormField(
+            key: ValueKey('other-details-${field.id}'),
+            controller: _controllers[detailsKey],
+            onChanged: (value) => _setValue(detailsKey, value.trim()),
+            decoration: const InputDecoration(border: OutlineInputBorder()),
+          ),
+        ],
       ),
     ];
   }
+
+  Widget _labelledInput({
+    required BuildContext context,
+    required DynamicFormField field,
+    required Widget input,
+  }) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(field.label, style: Theme.of(context).textTheme.titleMedium),
+      if (field.description case final description?) ...[
+        const SizedBox(height: 4),
+        Text(description),
+      ],
+      const SizedBox(height: 8),
+      input,
+    ],
+  );
 
   Widget _buildQuestion(
     BuildContext context,
@@ -406,21 +439,22 @@ class _DynamicFormViewState extends State<DynamicFormView> {
       case DynamicFieldType.multiline:
       case DynamicFieldType.phone:
       case DynamicFieldType.number:
-        return TextFormField(
-          controller: _controllers[field.id],
-          onChanged: (value) => _setValue(field.id, value.trim()),
-          maxLines: field.type == DynamicFieldType.multiline ? 4 : 1,
-          keyboardType: switch (field.type) {
-            DynamicFieldType.phone => TextInputType.phone,
-            DynamicFieldType.number => TextInputType.number,
-            _ => TextInputType.text,
-          },
-          decoration: InputDecoration(
-            labelText: field.label,
-            hintText: field.placeholder,
-            helperText: helper,
-            border: const OutlineInputBorder(),
-            alignLabelWithHint: field.type == DynamicFieldType.multiline,
+        return _labelledInput(
+          context: context,
+          field: field,
+          input: TextFormField(
+            controller: _controllers[field.id],
+            onChanged: (value) => _setValue(field.id, value.trim()),
+            maxLines: field.type == DynamicFieldType.multiline ? 4 : 1,
+            keyboardType: switch (field.type) {
+              DynamicFieldType.phone => TextInputType.phone,
+              DynamicFieldType.number => TextInputType.number,
+              _ => TextInputType.text,
+            },
+            decoration: InputDecoration(
+              hintText: field.placeholder,
+              border: const OutlineInputBorder(),
+            ),
           ),
         );
       case DynamicFieldType.date:
@@ -482,26 +516,29 @@ class _DynamicFormViewState extends State<DynamicFormView> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              DropdownButtonFormField<String>(
-                key: ValueKey('single-choice-dropdown-${field.id}'),
-                value: selected,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  labelText: field.label,
-                  helperText: helper,
-                  border: const OutlineInputBorder(),
-                ),
-                items: [
-                  for (final option in field.options)
-                    DropdownMenuItem<String>(
-                      value: option.value,
-                      child: Text(
-                        option.label,
-                        overflow: TextOverflow.ellipsis,
+              _labelledInput(
+                context: context,
+                field: field,
+                input: DropdownButtonFormField<String>(
+                  key: ValueKey('single-choice-dropdown-${field.id}'),
+                  value: selected,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    hintText: field.placeholder ?? 'Select an option',
+                    border: const OutlineInputBorder(),
+                  ),
+                  items: [
+                    for (final option in field.options)
+                      DropdownMenuItem<String>(
+                        value: option.value,
+                        child: Text(
+                          option.label,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                ],
-                onChanged: (value) => _setValue(field.id, value),
+                  ],
+                  onChanged: (value) => _setValue(field.id, value),
+                ),
               ),
               if (selectedDescription != null) ...[
                 const SizedBox(height: 6),

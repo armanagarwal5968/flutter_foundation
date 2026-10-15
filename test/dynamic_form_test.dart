@@ -400,6 +400,92 @@ void main() {
     expect(submitted, {'name': 'Mother', 'first_pregnancy': false});
   });
 
+  testWidgets('questions are rendered above text inputs', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DynamicFormView(definition: definition, onSubmit: (_) async {}),
+        ),
+      ),
+    );
+
+    expect(find.text('Name'), findsOneWidget);
+    final input = tester.widget<TextField>(find.byType(TextField));
+    expect(input.decoration?.labelText, isNull);
+  });
+
+  testWidgets('moving between sections resets the form scroll position', (
+    tester,
+  ) async {
+    const longDefinition = DynamicFormDefinition(
+      id: 'long_form',
+      title: 'Long form',
+      sections: [
+        DynamicFormSection(
+          id: 'long_first',
+          title: 'Long first step',
+          fields: [
+            DynamicFormField(
+              id: 'notes_1',
+              label: 'Notes 1',
+              type: DynamicFieldType.multiline,
+            ),
+            DynamicFormField(
+              id: 'notes_2',
+              label: 'Notes 2',
+              type: DynamicFieldType.multiline,
+            ),
+            DynamicFormField(
+              id: 'notes_3',
+              label: 'Notes 3',
+              type: DynamicFieldType.multiline,
+            ),
+          ],
+        ),
+        DynamicFormSection(
+          id: 'second',
+          title: 'Second step starts here',
+          fields: [
+            DynamicFormField(
+              id: 'answer',
+              label: 'Answer',
+              type: DynamicFieldType.text,
+            ),
+          ],
+        ),
+      ],
+    );
+    await tester.binding.setSurfaceSize(const Size(400, 500));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DynamicFormView(
+            definition: longDefinition,
+            onSubmit: (_) async {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.dragUntilVisible(
+      find.text('Continue'),
+      find.byType(ListView),
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    final scrollable = tester.state<ScrollableState>(
+      find.byType(Scrollable).first,
+    );
+    expect(scrollable.position.pixels, greaterThan(0));
+
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+
+    expect(scrollable.position.pixels, 0);
+    expect(find.text('Second step starts here'), findsOneWidget);
+  });
+
   testWidgets('required metadata does not block an empty submission', (
     tester,
   ) async {
