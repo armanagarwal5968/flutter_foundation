@@ -8,8 +8,10 @@ import 'authentication_service.dart';
 
 /// Firebase Authentication backed by Google, Apple, and email/password.
 ///
-/// Web uses Firebase's popup flow. Android and iOS use the native Google
-/// Sign-In SDK and exchange its ID token for a Firebase credential.
+/// Desktop web uses Firebase's popup flow. Mobile web uses a full-page
+/// redirect because popup state can be lost when Safari is opened from apps
+/// such as WhatsApp. Android and iOS use the native Google Sign-In SDK and
+/// exchange its ID token for a Firebase credential.
 class FirebaseAuthenticationService
     implements AuthenticationService, EmailPasswordAuthenticationService {
   FirebaseAuthenticationService({
@@ -59,6 +61,15 @@ class FirebaseAuthenticationService
   Future<AuthUser?> signInWithGoogle() async {
     final UserCredential credential;
     if (kIsWeb) {
+      if (shouldUseGoogleRedirect(
+        isWeb: kIsWeb,
+        platform: defaultTargetPlatform,
+      )) {
+        await _firebaseAuth.signInWithRedirect(GoogleAuthProvider());
+        // The browser leaves this page. Firebase restores the signed-in user
+        // through authStateChanges when the redirect returns.
+        return null;
+      }
       credential = await _firebaseAuth.signInWithPopup(GoogleAuthProvider());
     } else {
       await initialize();
@@ -139,6 +150,14 @@ class FirebaseAuthenticationService
     );
   }
 }
+
+@visibleForTesting
+bool shouldUseGoogleRedirect({
+  required bool isWeb,
+  required TargetPlatform platform,
+}) =>
+    isWeb &&
+    (platform == TargetPlatform.iOS || platform == TargetPlatform.android);
 
 /// Backward-compatible name retained for existing foundation consumers.
 @Deprecated('Use FirebaseAuthenticationService instead.')
