@@ -16,6 +16,8 @@ class DynamicFormView extends StatefulWidget {
     this.onSubmitted,
     this.initialValues = const {},
     this.fileUploader,
+    this.showSectionHeader = true,
+    this.sectionHeaderDecoration,
     super.key,
   });
 
@@ -24,6 +26,8 @@ class DynamicFormView extends StatefulWidget {
   final Future<void> Function()? onSubmitted;
   final Map<String, Object?> initialValues;
   final DynamicFormFileUploader? fileUploader;
+  final bool showSectionHeader;
+  final BoxDecoration? sectionHeaderDecoration;
 
   @override
   State<DynamicFormView> createState() => _DynamicFormViewState();
@@ -35,6 +39,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
   final _scrollController = ScrollController();
   int _sectionIndex = 0;
   bool _submitting = false;
+  bool _uploading = false;
   String? _error;
 
   DynamicFormSection get _section => widget.definition.sections[_sectionIndex];
@@ -142,8 +147,8 @@ class _DynamicFormViewState extends State<DynamicFormView> {
             .length;
     var questionIndex = questionOffset;
     return BlockingProgressOverlay(
-      visible: _submitting,
-      message: 'Submitting form…',
+      visible: _submitting || _uploading,
+      message: _uploading ? 'Uploading file…' : 'Submitting form…',
       child: ListView(
         controller: _scrollController,
         padding: const EdgeInsets.all(20),
@@ -158,14 +163,30 @@ class _DynamicFormViewState extends State<DynamicFormView> {
               style: Theme.of(context).textTheme.labelLarge,
             ),
           ],
-          const SizedBox(height: 12),
-          Text(
-            _section.title,
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          if (_section.description case final description?) ...[
-            const SizedBox(height: 8),
-            Text(description),
+          if (widget.showSectionHeader) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding:
+                  widget.sectionHeaderDecoration == null
+                      ? EdgeInsets.zero
+                      : const EdgeInsets.all(12),
+              decoration: widget.sectionHeaderDecoration,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _section.title,
+                    softWrap: true,
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  if (_section.description case final description?) ...[
+                    const SizedBox(height: 8),
+                    Text(description),
+                  ],
+                ],
+              ),
+            ),
           ],
           const SizedBox(height: 20),
           for (final field in visibleFields) ...[
@@ -190,7 +211,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed:
-                        _submitting
+                        (_submitting || _uploading)
                             ? null
                             : () => _showSection(_sectionIndex - 1),
                     child: const Text('Back'),
@@ -200,7 +221,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
               Expanded(
                 child: FilledButton(
                   onPressed:
-                      _submitting
+                      (_submitting || _uploading)
                           ? null
                           : isLast
                           ? (widget.definition.confirmBeforeSubmit
@@ -626,7 +647,9 @@ class _DynamicFormViewState extends State<DynamicFormView> {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: OutlinedButton.icon(
                   onPressed:
-                      _submitting ? null : () => _uploadFile(field, category),
+                      (_submitting || _uploading)
+                          ? null
+                          : () => _uploadFile(field, category),
                   icon: const Icon(Icons.upload_file),
                   label: Text('Upload ${category.label}'),
                 ),
@@ -674,7 +697,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
     final uploader =
         widget.fileUploader ?? FirebaseDynamicFormFileUploader().upload;
     setState(() {
-      _submitting = true;
+      _uploading = true;
       _error = null;
     });
     try {
@@ -695,7 +718,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
     } on Object catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
-      if (mounted) setState(() => _submitting = false);
+      if (mounted) setState(() => _uploading = false);
     }
   }
 }

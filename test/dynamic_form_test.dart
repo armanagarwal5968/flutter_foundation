@@ -759,6 +759,59 @@ void main() {
     expect(upload['fileName'], 'file.pdf');
   });
 
+  testWidgets('file upload uses upload progress instead of submit progress', (
+    tester,
+  ) async {
+    final upload = Completer<Map<String, Object?>?>();
+    const definition = DynamicFormDefinition(
+      id: 'enrolment',
+      title: 'Enrollment',
+      sections: [
+        DynamicFormSection(
+          id: 'reports',
+          title: 'Reports',
+          fields: [
+            DynamicFormField(
+              id: 'latest_reports',
+              label: 'Latest reports',
+              type: DynamicFieldType.fileUpload,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DynamicFormView(
+            definition: definition,
+            fileUploader:
+                ({required formId, required fieldId, category}) =>
+                    upload.future,
+            onSubmit: (_) async {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Upload File'));
+    await tester.pump();
+    expect(find.text('Uploading file…'), findsOneWidget);
+    expect(find.text('Submitting form…'), findsNothing);
+    expect(find.text('Submit'), findsOneWidget);
+
+    upload.complete({
+      'storagePath': 'form_uploads/user/enrolment/latest_reports/file.pdf',
+      'fileName': 'file.pdf',
+      'category': 'File',
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('Uploading file…'), findsNothing);
+    expect(find.text('file.pdf'), findsOneWidget);
+    expect(find.text('Submit'), findsOneWidget);
+  });
+
   testWidgets('blocks the form with progress feedback while submitting', (
     tester,
   ) async {
