@@ -410,7 +410,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Name'), findsOneWidget);
+    expect(find.textContaining('Name'), findsOneWidget);
     final input = tester.widget<TextField>(find.byType(TextField));
     expect(input.decoration?.labelText, isNull);
   });
@@ -529,7 +529,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(submitted, isEmpty);
-    expect(find.textContaining('*'), findsNothing);
+    expect(find.textContaining('*'), findsOneWidget);
   });
 
   testWidgets('enforced required fields block navigation and submission', (
@@ -585,7 +585,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Required'), findsOneWidget);
+    expect(find.textContaining('*'), findsOneWidget);
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('required-error-name')), findsOneWidget);

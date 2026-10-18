@@ -410,7 +410,11 @@ class _DynamicFormViewState extends State<DynamicFormView> {
   }) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text(field.label, style: Theme.of(context).textTheme.titleMedium),
+      _fieldLabel(
+        context,
+        field,
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
       if (field.description case final description?) ...[
         const SizedBox(height: 4),
         Text(description),
@@ -418,6 +422,27 @@ class _DynamicFormViewState extends State<DynamicFormView> {
       const SizedBox(height: 8),
       input,
     ],
+  );
+
+  Widget _fieldLabel(
+    BuildContext context,
+    DynamicFormField field, {
+    TextStyle? style,
+  }) => Text.rich(
+    TextSpan(
+      children: [
+        TextSpan(text: field.label),
+        if (field.required)
+          TextSpan(
+            text: ' *',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.error,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+      ],
+    ),
+    style: style,
   );
 
   Widget _buildQuestion(
@@ -466,16 +491,6 @@ class _DynamicFormViewState extends State<DynamicFormView> {
   ) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      if (field.required && field.type != DynamicFieldType.info) ...[
-        Text(
-          'Required',
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: Theme.of(context).colorScheme.error,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 4),
-      ],
       child,
       if (_requiredErrors.contains(field.id)) ...[
         const SizedBox(height: 6),
@@ -564,7 +579,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
             side: BorderSide(color: Theme.of(context).colorScheme.outline),
             borderRadius: BorderRadius.circular(4),
           ),
-          title: Text(field.label),
+          title: _fieldLabel(context, field),
           subtitle: Text(
             value == null
                 ? field.placeholder ?? 'Select date'
@@ -587,7 +602,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(field.label),
+            _fieldLabel(context, field),
             if (helper != null) Text(helper),
             SegmentedButton<bool>(
               segments: const [
@@ -650,7 +665,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(field.label),
+            _fieldLabel(context, field),
             if (helper != null) Text(helper),
             for (final option in field.options)
               RadioListTile<String>(
@@ -673,7 +688,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(field.label),
+            _fieldLabel(context, field),
             if (helper != null) Text(helper),
             for (final option in field.options)
               CheckboxListTile(
@@ -717,7 +732,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(field.label),
+            _fieldLabel(context, field),
             if (helper != null) Text(helper),
             const SizedBox(height: 8),
             for (final category in categories)
@@ -750,7 +765,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(field.label),
+            _fieldLabel(context, field),
             Row(
               children: [
                 for (var index = 1; index <= (field.maximum ?? 5); index++)
