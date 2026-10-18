@@ -1,28 +1,25 @@
 import 'dart:async';
 
 import 'package:firebase_analytics/firebase_analytics.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+
+import 'firebase_crash_reporter.dart';
 
 /// Shared Firebase Analytics and crash/error reporting for Flutter apps.
 ///
 /// Analytics never receives exception messages or stack traces. Native
 /// Crashlytics receives full diagnostics on Android and iOS only.
 class FirebaseTelemetry {
-  FirebaseTelemetry._();
+  FirebaseTelemetry._({FirebaseCrashReporter? crashReporter})
+    : _crashReporter = crashReporter ?? FirebaseCrashReporter();
 
   static final FirebaseTelemetry instance = FirebaseTelemetry._();
 
   FirebaseAnalytics? _analytics;
-  FirebaseCrashlytics? _crashlytics;
+  final FirebaseCrashReporter _crashReporter;
   bool _initialized = false;
   bool _handlersInstalled = false;
-
-  bool get _supportsCrashlytics =>
-      !kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS);
 
   NavigatorObserver? get navigatorObserver =>
       _analytics == null
@@ -39,10 +36,9 @@ class FirebaseTelemetry {
       debugPrint('Analytics initialization deferred: $error');
     }
 
-    if (_supportsCrashlytics) {
+    if (_crashReporter.isSupported) {
       try {
-        _crashlytics = FirebaseCrashlytics.instance;
-        await _crashlytics!.setCrashlyticsCollectionEnabled(collectionEnabled);
+        await _crashReporter.initialize(collectionEnabled: collectionEnabled);
       } on Object catch (error) {
         debugPrint('Crashlytics initialization deferred: $error');
       }
@@ -88,8 +84,10 @@ class FirebaseTelemetry {
       debugPrint('Analytics user update deferred: $error');
     }
     try {
-      await _crashlytics?.setUserIdentifier(userId ?? 'signed_out');
-      await _crashlytics?.setCustomKey('account_roles', roleValue);
+      await _crashReporter.identifyUser(
+        userId,
+        attributes: {'account_roles': roleValue},
+      );
     } on Object catch (error) {
       debugPrint('Crashlytics user update deferred: $error');
     }
@@ -130,7 +128,7 @@ class FirebaseTelemetry {
     debugPrint('[$context] $error\n$stack');
 
     try {
-      await _crashlytics?.recordError(
+      await _crashReporter.recordError(
         error,
         stack,
         fatal: fatal,

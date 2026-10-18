@@ -46,6 +46,7 @@ void main() {
     expect(parsed.sections.length, 2);
     expect(parsed.sections.last.fields.single.type, DynamicFieldType.yesNo);
     expect(parsed.questionIndicator, DynamicQuestionIndicator.numbered);
+    expect(parsed.enforceRequiredFields, isFalse);
   });
 
   testWidgets('conditional follow-up appears only for the matching answer', (
@@ -529,6 +530,85 @@ void main() {
 
     expect(submitted, isEmpty);
     expect(find.textContaining('*'), findsNothing);
+  });
+
+  testWidgets('enforced required fields block navigation and submission', (
+    tester,
+  ) async {
+    Map<String, Object?>? submitted;
+    const enforcedDefinition = DynamicFormDefinition(
+      id: 'enforced',
+      title: 'Enforced form',
+      enforceRequiredFields: true,
+      sections: [
+        DynamicFormSection(
+          id: 'first',
+          title: 'First',
+          fields: [
+            DynamicFormField(
+              id: 'name',
+              label: 'Name',
+              type: DynamicFieldType.text,
+              required: true,
+            ),
+          ],
+        ),
+        DynamicFormSection(
+          id: 'second',
+          title: 'Second',
+          fields: [
+            DynamicFormField(
+              id: 'consent',
+              label: 'Consent?',
+              type: DynamicFieldType.yesNo,
+              required: true,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    final parsed = DynamicFormDefinition.fromJson(
+      enforcedDefinition.id,
+      enforcedDefinition.toJson(),
+    );
+    expect(parsed.enforceRequiredFields, isTrue);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DynamicFormView(
+            definition: enforcedDefinition,
+            onSubmit: (values) async => submitted = values,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Required'), findsOneWidget);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('required-error-name')), findsOneWidget);
+    expect(find.text('First'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextFormField), 'Asha');
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Second'), findsOneWidget);
+
+    await tester.tap(find.text('Submit'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('required-error-consent')),
+      findsOneWidget,
+    );
+    expect(submitted, isNull);
+
+    await tester.tap(find.text('Yes'));
+    await tester.tap(find.text('Submit'));
+    await tester.pumpAndSettle();
+    expect(submitted, containsPair('name', 'Asha'));
+    expect(submitted, containsPair('consent', true));
   });
 
   testWidgets('single choice with more than ten options uses a dropdown', (

@@ -226,6 +226,7 @@ class DynamicFormDefinition {
     this.published = true,
     this.catalogVisible = true,
     this.confirmBeforeSubmit = false,
+    this.enforceRequiredFields = false,
     this.questionIndicator = DynamicQuestionIndicator.numbered,
   });
 
@@ -237,6 +238,7 @@ class DynamicFormDefinition {
   final bool published;
   final bool catalogVisible;
   final bool confirmBeforeSubmit;
+  final bool enforceRequiredFields;
   final DynamicQuestionIndicator questionIndicator;
   final List<DynamicFormSection> sections;
 
@@ -252,6 +254,7 @@ class DynamicFormDefinition {
     published: json['published'] as bool? ?? false,
     catalogVisible: json['catalogVisible'] as bool? ?? true,
     confirmBeforeSubmit: json['confirmBeforeSubmit'] as bool? ?? false,
+    enforceRequiredFields: json['enforceRequiredFields'] as bool? ?? false,
     questionIndicator: DynamicQuestionIndicator.fromJson(
       json['questionIndicator'],
     ),
@@ -272,6 +275,7 @@ class DynamicFormDefinition {
     'published': published,
     'catalogVisible': catalogVisible,
     'confirmBeforeSubmit': confirmBeforeSubmit,
+    'enforceRequiredFields': enforceRequiredFields,
     'questionIndicator': questionIndicator.name,
     'sections': sections.map((section) => section.toJson()).toList(),
   };

@@ -17,6 +17,7 @@ export 'src/forms/dynamic_form_view.dart';
 export 'src/formatting/friendly_date.dart';
 export 'src/media/session_media.dart';
 export 'src/telemetry/firebase_telemetry.dart';
+export 'src/telemetry/firebase_crash_reporter.dart';
 export 'src/widgets/blocking_progress_overlay.dart';
 
 /// Metadata for the shared foundation package.

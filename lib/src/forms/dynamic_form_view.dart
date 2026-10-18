@@ -41,6 +41,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
   bool _submitting = false;
   bool _uploading = false;
   String? _error;
+  final _requiredErrors = <String>{};
 
   DynamicFormSection get _section => widget.definition.sections[_sectionIndex];
 
@@ -84,6 +85,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
 
   void _continue() {
     _syncControllerValues();
+    if (!_validateRequiredFields([_section])) return;
     _showSection(_sectionIndex + 1);
   }
 
@@ -101,6 +103,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
 
   Future<void> _submit() async {
     _syncControllerValues();
+    if (!_validateRequiredFields(widget.definition.sections)) return;
     setState(() {
       _submitting = true;
       _error = null;
@@ -119,6 +122,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
 
   Future<void> _reviewAndSubmit() async {
     _syncControllerValues();
+    if (!_validateRequiredFields(widget.definition.sections)) return;
     final confirmed = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder:
@@ -277,8 +281,45 @@ class _DynamicFormViewState extends State<DynamicFormView> {
   void _setValue(String fieldId, Object? value) {
     setState(() {
       _values[fieldId] = value;
+      _requiredErrors.remove(fieldId);
       _removeHiddenValues();
     });
+  }
+
+  bool _validateRequiredFields(Iterable<DynamicFormSection> sections) {
+    if (!widget.definition.enforceRequiredFields) return true;
+    final missing = <String>{};
+    for (final field in sections.expand((section) => section.fields)) {
+      if (!field.required || field.type == DynamicFieldType.info) continue;
+      if (!_isVisible(field)) continue;
+      if (_isEmptyAnswer(_values[field.id])) missing.add(field.id);
+    }
+    setState(() {
+      _requiredErrors
+        ..clear()
+        ..addAll(missing);
+      _error = missing.isEmpty ? null : 'Complete all required fields.';
+    });
+    if (missing.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _scrollController.hasClients) {
+          _scrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+    return missing.isEmpty;
+  }
+
+  bool _isEmptyAnswer(Object? value) {
+    if (value == null) return true;
+    if (value is String) return value.trim().isEmpty;
+    if (value is Iterable) return value.isEmpty;
+    if (value is Map) return value.isEmpty;
+    return false;
   }
 
   void _removeHiddenValues() {
@@ -386,7 +427,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
   ) {
     final indicator = widget.definition.questionIndicator;
     if (questionNumber == null || indicator == DynamicQuestionIndicator.none) {
-      return _buildField(context, field);
+      return _withRequiredState(context, field, _buildField(context, field));
     }
     final marker = switch (indicator) {
       DynamicQuestionIndicator.none => '',
@@ -407,10 +448,47 @@ class _DynamicFormViewState extends State<DynamicFormView> {
             ),
           ),
         ),
-        Expanded(child: _buildField(context, field)),
+        Expanded(
+          child: _withRequiredState(
+            context,
+            field,
+            _buildField(context, field),
+          ),
+        ),
       ],
     );
   }
+
+  Widget _withRequiredState(
+    BuildContext context,
+    DynamicFormField field,
+    Widget child,
+  ) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      if (field.required && field.type != DynamicFieldType.info) ...[
+        Text(
+          'Required',
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: Theme.of(context).colorScheme.error,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+      ],
+      child,
+      if (_requiredErrors.contains(field.id)) ...[
+        const SizedBox(height: 6),
+        Text(
+          'This field is required.',
+          key: ValueKey('required-error-${field.id}'),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.error,
+          ),
+        ),
+      ],
+    ],
+  );
 
   Widget _buildField(BuildContext context, DynamicFormField field) {
     final helper = field.description;

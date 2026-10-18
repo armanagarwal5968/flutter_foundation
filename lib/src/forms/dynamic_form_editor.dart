@@ -28,6 +28,7 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
   late bool _published;
   late bool _catalogVisible;
   late bool _confirmBeforeSubmit;
+  late bool _enforceRequiredFields;
   late DynamicQuestionIndicator _questionIndicator;
   bool _saving = false;
 
@@ -41,6 +42,7 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
     _published = widget.form.published;
     _catalogVisible = widget.form.catalogVisible;
     _confirmBeforeSubmit = widget.form.confirmBeforeSubmit;
+    _enforceRequiredFields = widget.form.enforceRequiredFields;
     _questionIndicator = widget.form.questionIndicator;
   }
 
@@ -75,6 +77,7 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
         published: _published,
         catalogVisible: _catalogVisible,
         confirmBeforeSubmit: _confirmBeforeSubmit,
+        enforceRequiredFields: _enforceRequiredFields,
         questionIndicator: _questionIndicator,
         sections: _sections,
       );
@@ -694,6 +697,17 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
             value: _confirmBeforeSubmit,
             onChanged: (value) => setState(() => _confirmBeforeSubmit = value),
             title: const Text('Review answers before submitting'),
+          ),
+          SwitchListTile(
+            key: const Key('enforce-required-fields-switch'),
+            contentPadding: EdgeInsets.zero,
+            value: _enforceRequiredFields,
+            onChanged:
+                (value) => setState(() => _enforceRequiredFields = value),
+            title: const Text('Enforce required fields'),
+            subtitle: const Text(
+              'Prevent continuing or submitting until visible required questions are answered.',
+            ),
           ),
           const Divider(),
           for (
