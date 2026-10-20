@@ -152,6 +152,56 @@ void main() {
     expect(find.text('•'), findsOneWidget);
   });
 
+  testWidgets('question labels and indicators use consistent typography', (
+    tester,
+  ) async {
+    const definition = DynamicFormDefinition(
+      id: 'consistent_typography',
+      title: 'Consistent typography',
+      questionIndicator: DynamicQuestionIndicator.numbered,
+      sections: [
+        DynamicFormSection(
+          id: 'questions',
+          title: 'Questions',
+          fields: [
+            DynamicFormField(
+              id: 'choice',
+              label: 'Choose support',
+              type: DynamicFieldType.multiChoice,
+              options: [DynamicFieldOption(value: 'partner', label: 'Partner')],
+            ),
+            DynamicFormField(
+              id: 'details',
+              label: 'Add details',
+              type: DynamicFieldType.multiline,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DynamicFormView(definition: definition, onSubmit: (_) async {}),
+        ),
+      ),
+    );
+
+    final choiceLabel = tester.widget<Text>(
+      find.byKey(const ValueKey('question-label-choice')),
+    );
+    final detailsLabel = tester.widget<Text>(
+      find.byKey(const ValueKey('question-label-details')),
+    );
+    final indicator = tester.widget<Text>(
+      find.byKey(const ValueKey('question-indicator-choice')),
+    );
+
+    expect(choiceLabel.style, detailsLabel.style);
+    expect(choiceLabel.style, indicator.style);
+  });
+
   testWidgets('Other choices reveal and submit a details text box', (
     tester,
   ) async {

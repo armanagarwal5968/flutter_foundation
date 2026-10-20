@@ -429,6 +429,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
     DynamicFormField field, {
     TextStyle? style,
   }) => Text.rich(
+    key: ValueKey('question-label-${field.id}'),
     TextSpan(
       children: [
         TextSpan(text: field.label),
@@ -442,7 +443,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
           ),
       ],
     ),
-    style: style,
+    style: style ?? Theme.of(context).textTheme.titleMedium,
   );
 
   Widget _buildQuestion(
@@ -464,13 +465,10 @@ class _DynamicFormViewState extends State<DynamicFormView> {
       children: [
         SizedBox(
           width: 32,
-          child: Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: Text(
-              marker,
-              key: ValueKey('question-indicator-${field.id}'),
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+          child: Text(
+            marker,
+            key: ValueKey('question-indicator-${field.id}'),
+            style: Theme.of(context).textTheme.titleMedium,
           ),
         ),
         Expanded(
