@@ -290,7 +290,11 @@ class _DynamicFormViewState extends State<DynamicFormView> {
     if (!widget.definition.enforceRequiredFields) return true;
     final missing = <String>{};
     for (final field in sections.expand((section) => section.fields)) {
-      if (!field.required || field.type == DynamicFieldType.info) continue;
+      if (!field.required ||
+          field.type == DynamicFieldType.info ||
+          field.type == DynamicFieldType.privacy) {
+        continue;
+      }
       if (!_isVisible(field)) continue;
       if (_isEmptyAnswer(_values[field.id])) missing.add(field.id);
     }
@@ -547,10 +551,9 @@ class _DynamicFormViewState extends State<DynamicFormView> {
             ),
           ),
         );
-      case DynamicFieldType.consent:
-        final accepted = _values[field.id] == true;
+      case DynamicFieldType.privacy:
         return Card(
-          key: ValueKey('dynamic-form-consent-${field.id}'),
+          key: ValueKey('dynamic-form-privacy-${field.id}'),
           elevation: 0,
           color: Theme.of(context).colorScheme.surfaceContainerLowest,
           shape: RoundedRectangleBorder(
@@ -588,29 +591,13 @@ class _DynamicFormViewState extends State<DynamicFormView> {
                         url: field.secondaryLinkUrl!,
                       ),
                     ],
+                    if (field.confirmationText != null)
+                      Text(
+                        field.confirmationText!,
+                        textAlign: TextAlign.center,
+                      ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  key: ValueKey('dynamic-form-consent-action-${field.id}'),
-                  onPressed: accepted ? null : () => _setValue(field.id, true),
-                  icon: Icon(
-                    accepted
-                        ? Icons.check_circle
-                        : Icons.verified_user_outlined,
-                  ),
-                  label: Text(
-                    accepted ? 'Accepted' : field.actionLabel ?? 'I Accept',
-                  ),
-                ),
-                if (field.confirmationText != null) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    field.confirmationText!,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
               ],
             ),
           ),

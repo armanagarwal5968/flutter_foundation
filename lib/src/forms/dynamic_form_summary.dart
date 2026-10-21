@@ -42,7 +42,7 @@ List<String> buildDynamicFormSummary(
             summary.add('${field.label}: Yes');
           }
         case DynamicFieldType.info:
-        case DynamicFieldType.consent:
+        case DynamicFieldType.privacy:
         case DynamicFieldType.fileUpload:
           break;
         case DynamicFieldType.text:

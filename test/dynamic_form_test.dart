@@ -1065,31 +1065,29 @@ void main() {
     ]);
   });
 
-  testWidgets('consent field uses one action without a checkbox', (
+  testWidgets('privacy field uses inline links without a separate action', (
     tester,
   ) async {
     Map<String, Object?>? submitted;
-    const consentDefinition = DynamicFormDefinition(
-      id: 'consent_form',
-      title: 'Consent form',
+    const privacyDefinition = DynamicFormDefinition(
+      id: 'privacy_form',
+      title: 'Privacy form',
       enforceRequiredFields: true,
       sections: [
         DynamicFormSection(
-          id: 'consent',
-          title: 'Consent',
+          id: 'privacy',
+          title: 'Privacy',
           fields: [
             DynamicFormField(
-              id: 'agreement_accepted',
-              label: 'Consent',
-              type: DynamicFieldType.consent,
-              required: true,
-              description: 'To continue, accept our',
+              id: 'privacy_notice',
+              label: 'Privacy and terms',
+              type: DynamicFieldType.privacy,
+              description: 'By submitting, you agree to our',
               linkLabel: 'Privacy Policy',
               linkUrl: 'https://example.com/privacy',
               secondaryLinkLabel: 'Terms & Conditions',
               secondaryLinkUrl: 'https://example.com/terms',
-              actionLabel: 'I Accept',
-              confirmationText: 'You confirm that you are 18 or older.',
+              confirmationText: 'and confirm that you are 18 or older.',
             ),
           ],
         ),
@@ -1097,13 +1095,13 @@ void main() {
     );
 
     final parsed = DynamicFormDefinition.fromJson(
-      consentDefinition.id,
-      consentDefinition.toJson(),
+      privacyDefinition.id,
+      privacyDefinition.toJson(),
     );
     final field = parsed.sections.single.fields.single;
-    expect(field.type, DynamicFieldType.consent);
+    expect(field.type, DynamicFieldType.privacy);
     expect(field.secondaryLinkLabel, 'Terms & Conditions');
-    expect(field.actionLabel, 'I Accept');
+    expect(field.confirmationText, 'and confirm that you are 18 or older.');
 
     await tester.pumpWidget(
       MaterialApp(
@@ -1119,17 +1117,10 @@ void main() {
     expect(find.byType(Checkbox), findsNothing);
     expect(find.text('Privacy Policy'), findsOneWidget);
     expect(find.text('Terms & Conditions'), findsOneWidget);
+    expect(find.text('I Accept'), findsNothing);
     await tester.tap(find.text('Submit'));
     await tester.pumpAndSettle();
-    expect(submitted, isNull);
-    expect(find.text('This field is required.'), findsOneWidget);
-
-    await tester.tap(find.text('I Accept'));
-    await tester.pump();
-    expect(find.text('Accepted'), findsOneWidget);
-    await tester.tap(find.text('Submit'));
-    await tester.pumpAndSettle();
-    expect(submitted, {'agreement_accepted': true});
+    expect(submitted, isEmpty);
   });
 }
 

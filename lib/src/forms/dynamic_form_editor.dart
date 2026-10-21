@@ -203,7 +203,6 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
     final secondaryLinkUrl = TextEditingController(
       text: existing?.secondaryLinkUrl,
     );
-    final actionLabel = TextEditingController(text: existing?.actionLabel);
     final confirmationText = TextEditingController(
       text: existing?.confirmationText,
     );
@@ -430,7 +429,7 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
                               ),
                         ],
                         if (type == DynamicFieldType.info ||
-                            type == DynamicFieldType.consent) ...[
+                            type == DynamicFieldType.privacy) ...[
                           TextField(
                             controller: linkLabel,
                             decoration: const InputDecoration(
@@ -445,7 +444,7 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
                             ),
                           ),
                         ],
-                        if (type == DynamicFieldType.consent) ...[
+                        if (type == DynamicFieldType.privacy) ...[
                           TextField(
                             controller: secondaryLinkLabel,
                             decoration: const InputDecoration(
@@ -457,12 +456,6 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
                             keyboardType: TextInputType.url,
                             decoration: const InputDecoration(
                               labelText: 'Second link URL',
-                            ),
-                          ),
-                          TextField(
-                            controller: actionLabel,
-                            decoration: const InputDecoration(
-                              labelText: 'Acceptance button label',
                             ),
                           ),
                           TextField(
@@ -601,34 +594,29 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
                               linkLabel:
                                   (type != DynamicFieldType.info &&
                                               type !=
-                                                  DynamicFieldType.consent) ||
+                                                  DynamicFieldType.privacy) ||
                                           linkLabel.text.trim().isEmpty
                                       ? null
                                       : linkLabel.text.trim(),
                               linkUrl:
                                   (type != DynamicFieldType.info &&
                                               type !=
-                                                  DynamicFieldType.consent) ||
+                                                  DynamicFieldType.privacy) ||
                                           linkUrl.text.trim().isEmpty
                                       ? null
                                       : linkUrl.text.trim(),
                               secondaryLinkLabel:
-                                  type != DynamicFieldType.consent ||
+                                  type != DynamicFieldType.privacy ||
                                           secondaryLinkLabel.text.trim().isEmpty
                                       ? null
                                       : secondaryLinkLabel.text.trim(),
                               secondaryLinkUrl:
-                                  type != DynamicFieldType.consent ||
+                                  type != DynamicFieldType.privacy ||
                                           secondaryLinkUrl.text.trim().isEmpty
                                       ? null
                                       : secondaryLinkUrl.text.trim(),
-                              actionLabel:
-                                  type != DynamicFieldType.consent ||
-                                          actionLabel.text.trim().isEmpty
-                                      ? null
-                                      : actionLabel.text.trim(),
                               confirmationText:
-                                  type != DynamicFieldType.consent ||
+                                  type != DynamicFieldType.privacy ||
                                           confirmationText.text.trim().isEmpty
                                       ? null
                                       : confirmationText.text.trim(),
@@ -673,7 +661,6 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
     linkUrl.dispose();
     secondaryLinkLabel.dispose();
     secondaryLinkUrl.dispose();
-    actionLabel.dispose();
     confirmationText.dispose();
     placeholder.dispose();
     conditionValueText.dispose();

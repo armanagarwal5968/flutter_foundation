@@ -8,7 +8,7 @@ enum DynamicFieldType {
   yesNo,
   singleChoice,
   multiChoice,
-  consent,
+  privacy,
   fileUpload,
   rating;
 
@@ -114,7 +114,6 @@ class DynamicFormField {
     this.linkUrl,
     this.secondaryLinkLabel,
     this.secondaryLinkUrl,
-    this.actionLabel,
     this.confirmationText,
     this.placeholder,
     this.required = false,
@@ -133,7 +132,6 @@ class DynamicFormField {
   final String? linkUrl;
   final String? secondaryLinkLabel;
   final String? secondaryLinkUrl;
-  final String? actionLabel;
   final String? confirmationText;
   final String? placeholder;
   final bool required;
@@ -153,7 +151,6 @@ class DynamicFormField {
         linkUrl: json['linkUrl'] as String?,
         secondaryLinkLabel: json['secondaryLinkLabel'] as String?,
         secondaryLinkUrl: json['secondaryLinkUrl'] as String?,
-        actionLabel: json['actionLabel'] as String?,
         confirmationText: json['confirmationText'] as String?,
         placeholder: json['placeholder'] as String?,
         required: json['required'] as bool? ?? false,
@@ -184,7 +181,6 @@ class DynamicFormField {
     if (linkUrl != null) 'linkUrl': linkUrl,
     if (secondaryLinkLabel != null) 'secondaryLinkLabel': secondaryLinkLabel,
     if (secondaryLinkUrl != null) 'secondaryLinkUrl': secondaryLinkUrl,
-    if (actionLabel != null) 'actionLabel': actionLabel,
     if (confirmationText != null) 'confirmationText': confirmationText,
     if (placeholder != null) 'placeholder': placeholder,
     'required': required,
