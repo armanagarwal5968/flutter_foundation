@@ -547,6 +547,74 @@ class _DynamicFormViewState extends State<DynamicFormView> {
             ),
           ),
         );
+      case DynamicFieldType.consent:
+        final accepted = _values[field.id] == true;
+        return Card(
+          key: ValueKey('dynamic-form-consent-${field.id}'),
+          elevation: 0,
+          color: Theme.of(context).colorScheme.surfaceContainerLowest,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 4,
+                  runSpacing: 2,
+                  children: [
+                    Text(helper ?? field.label, textAlign: TextAlign.center),
+                    if (field.linkLabel != null && field.linkUrl != null)
+                      _InlineFormLink(
+                        key: ValueKey('dynamic-form-link-${field.id}'),
+                        label: field.linkLabel!,
+                        url: field.linkUrl!,
+                      ),
+                    if (field.secondaryLinkLabel != null &&
+                        field.secondaryLinkUrl != null) ...[
+                      const Text('&'),
+                      _InlineFormLink(
+                        key: ValueKey(
+                          'dynamic-form-secondary-link-${field.id}',
+                        ),
+                        label: field.secondaryLinkLabel!,
+                        url: field.secondaryLinkUrl!,
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  key: ValueKey('dynamic-form-consent-action-${field.id}'),
+                  onPressed: accepted ? null : () => _setValue(field.id, true),
+                  icon: Icon(
+                    accepted
+                        ? Icons.check_circle
+                        : Icons.verified_user_outlined,
+                  ),
+                  label: Text(
+                    accepted ? 'Accepted' : field.actionLabel ?? 'I Accept',
+                  ),
+                ),
+                if (field.confirmationText != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    field.confirmationText!,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
       case DynamicFieldType.text:
       case DynamicFieldType.multiline:
       case DynamicFieldType.phone:
@@ -812,6 +880,28 @@ class _DynamicFormViewState extends State<DynamicFormView> {
       if (mounted) setState(() => _uploading = false);
     }
   }
+}
+
+class _InlineFormLink extends StatelessWidget {
+  const _InlineFormLink({required this.label, required this.url, super.key});
+
+  final String label;
+  final String url;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap:
+        () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+    child: Text(
+      label,
+      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+        color: Theme.of(context).colorScheme.primary,
+        decoration: TextDecoration.underline,
+        decorationColor: Theme.of(context).colorScheme.primary,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
 }
 
 class DynamicFormConfirmationPage extends StatelessWidget {

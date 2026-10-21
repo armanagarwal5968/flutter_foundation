@@ -1064,6 +1064,73 @@ void main() {
       'first_field',
     ]);
   });
+
+  testWidgets('consent field uses one action without a checkbox', (
+    tester,
+  ) async {
+    Map<String, Object?>? submitted;
+    const consentDefinition = DynamicFormDefinition(
+      id: 'consent_form',
+      title: 'Consent form',
+      enforceRequiredFields: true,
+      sections: [
+        DynamicFormSection(
+          id: 'consent',
+          title: 'Consent',
+          fields: [
+            DynamicFormField(
+              id: 'agreement_accepted',
+              label: 'Consent',
+              type: DynamicFieldType.consent,
+              required: true,
+              description: 'To continue, accept our',
+              linkLabel: 'Privacy Policy',
+              linkUrl: 'https://example.com/privacy',
+              secondaryLinkLabel: 'Terms & Conditions',
+              secondaryLinkUrl: 'https://example.com/terms',
+              actionLabel: 'I Accept',
+              confirmationText: 'You confirm that you are 18 or older.',
+            ),
+          ],
+        ),
+      ],
+    );
+
+    final parsed = DynamicFormDefinition.fromJson(
+      consentDefinition.id,
+      consentDefinition.toJson(),
+    );
+    final field = parsed.sections.single.fields.single;
+    expect(field.type, DynamicFieldType.consent);
+    expect(field.secondaryLinkLabel, 'Terms & Conditions');
+    expect(field.actionLabel, 'I Accept');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DynamicFormView(
+            definition: parsed,
+            onSubmit: (values) async => submitted = values,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(Checkbox), findsNothing);
+    expect(find.text('Privacy Policy'), findsOneWidget);
+    expect(find.text('Terms & Conditions'), findsOneWidget);
+    await tester.tap(find.text('Submit'));
+    await tester.pumpAndSettle();
+    expect(submitted, isNull);
+    expect(find.text('This field is required.'), findsOneWidget);
+
+    await tester.tap(find.text('I Accept'));
+    await tester.pump();
+    expect(find.text('Accepted'), findsOneWidget);
+    await tester.tap(find.text('Submit'));
+    await tester.pumpAndSettle();
+    expect(submitted, {'agreement_accepted': true});
+  });
 }
 
 class _EditingFormRepository implements DynamicFormRepository {

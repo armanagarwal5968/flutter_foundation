@@ -8,6 +8,7 @@ enum DynamicFieldType {
   yesNo,
   singleChoice,
   multiChoice,
+  consent,
   fileUpload,
   rating;
 
@@ -111,6 +112,10 @@ class DynamicFormField {
     this.description,
     this.linkLabel,
     this.linkUrl,
+    this.secondaryLinkLabel,
+    this.secondaryLinkUrl,
+    this.actionLabel,
+    this.confirmationText,
     this.placeholder,
     this.required = false,
     this.options = const [],
@@ -126,6 +131,10 @@ class DynamicFormField {
   final String? description;
   final String? linkLabel;
   final String? linkUrl;
+  final String? secondaryLinkLabel;
+  final String? secondaryLinkUrl;
+  final String? actionLabel;
+  final String? confirmationText;
   final String? placeholder;
   final bool required;
   final List<DynamicFieldOption> options;
@@ -142,6 +151,10 @@ class DynamicFormField {
         description: json['description'] as String?,
         linkLabel: json['linkLabel'] as String?,
         linkUrl: json['linkUrl'] as String?,
+        secondaryLinkLabel: json['secondaryLinkLabel'] as String?,
+        secondaryLinkUrl: json['secondaryLinkUrl'] as String?,
+        actionLabel: json['actionLabel'] as String?,
+        confirmationText: json['confirmationText'] as String?,
         placeholder: json['placeholder'] as String?,
         required: json['required'] as bool? ?? false,
         options: (json['options'] as List<dynamic>? ?? const [])
@@ -169,6 +182,10 @@ class DynamicFormField {
     if (description != null) 'description': description,
     if (linkLabel != null) 'linkLabel': linkLabel,
     if (linkUrl != null) 'linkUrl': linkUrl,
+    if (secondaryLinkLabel != null) 'secondaryLinkLabel': secondaryLinkLabel,
+    if (secondaryLinkUrl != null) 'secondaryLinkUrl': secondaryLinkUrl,
+    if (actionLabel != null) 'actionLabel': actionLabel,
+    if (confirmationText != null) 'confirmationText': confirmationText,
     if (placeholder != null) 'placeholder': placeholder,
     'required': required,
     if (options.isNotEmpty)
