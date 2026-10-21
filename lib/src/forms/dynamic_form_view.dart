@@ -191,6 +191,8 @@ class _DynamicFormViewState extends State<DynamicFormView> {
                 ],
               ),
             ),
+            const SizedBox(height: 12),
+            const Divider(),
           ],
           const SizedBox(height: 20),
           for (final field in visibleFields) ...[
@@ -457,7 +459,15 @@ class _DynamicFormViewState extends State<DynamicFormView> {
   ) {
     final indicator = widget.definition.questionIndicator;
     if (questionNumber == null || indicator == DynamicQuestionIndicator.none) {
-      return _withRequiredState(context, field, _buildField(context, field));
+      final content = _withRequiredState(
+        context,
+        field,
+        _buildField(context, field),
+      );
+      return questionNumber == null &&
+              indicator != DynamicQuestionIndicator.none
+          ? Padding(padding: const EdgeInsets.only(left: 32), child: content)
+          : content;
     }
     final marker = switch (indicator) {
       DynamicQuestionIndicator.none => '',
@@ -722,6 +732,8 @@ class _DynamicFormViewState extends State<DynamicFormView> {
             if (helper != null) Text(helper),
             for (final option in field.options)
               RadioListTile<String>(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
                 value: option.value,
                 groupValue: _values[field.id] as String?,
                 title: Text(option.label),
