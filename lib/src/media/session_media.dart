@@ -7,7 +7,6 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-
 import 'storage_upload_stub.dart'
     if (dart.library.io) 'storage_upload_io.dart'
     as platform_upload;
@@ -42,6 +41,7 @@ class SessionMediaAsset {
     this.sortOrder = 0,
     this.visibleToPatient = true,
     this.status = 'ready',
+    this.version = 1,
   });
 
   factory SessionMediaAsset.fromDocument(
@@ -60,6 +60,7 @@ class SessionMediaAsset {
       sortOrder: (data['sortOrder'] as num?)?.toInt() ?? 0,
       visibleToPatient: data['visibleToPatient'] as bool? ?? true,
       status: data['status'] as String? ?? 'ready',
+      version: (data['version'] as num?)?.toInt() ?? 1,
     );
   }
 
@@ -74,6 +75,7 @@ class SessionMediaAsset {
   final int sortOrder;
   final bool visibleToPatient;
   final String status;
+  final int version;
 }
 
 class SessionMediaRepository {

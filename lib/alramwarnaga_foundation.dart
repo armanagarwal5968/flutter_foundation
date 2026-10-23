@@ -16,6 +16,7 @@ export 'src/forms/dynamic_form_summary.dart';
 export 'src/forms/dynamic_form_view.dart';
 export 'src/formatting/friendly_date.dart';
 export 'src/media/session_media.dart';
+export 'src/media/session_resource_viewer.dart';
 export 'src/telemetry/firebase_telemetry.dart';
 export 'src/telemetry/firebase_crash_reporter.dart';
 export 'src/widgets/blocking_progress_overlay.dart';
