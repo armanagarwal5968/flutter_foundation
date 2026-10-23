@@ -658,6 +658,7 @@ class _FullScreenVideoState extends State<_FullScreenVideo> {
                         onToggleMute: _interactAndToggleMute,
                         onFullScreen: () => Navigator.of(context).pop(),
                         fullScreenIcon: Icons.fullscreen_exit,
+                        fullScreenTooltip: 'Exit full screen',
                       ),
                     ],
                   ),
@@ -715,6 +716,7 @@ class _VideoControlsRow extends StatelessWidget {
     required this.onToggleMute,
     this.onFullScreen,
     this.fullScreenIcon = Icons.fullscreen,
+    this.fullScreenTooltip = 'Full screen',
   });
 
   final VideoPlayerController controller;
@@ -724,6 +726,7 @@ class _VideoControlsRow extends StatelessWidget {
   final VoidCallback onToggleMute;
   final VoidCallback? onFullScreen;
   final IconData fullScreenIcon;
+  final String fullScreenTooltip;
 
   @override
   Widget build(BuildContext context) {
@@ -780,7 +783,7 @@ class _VideoControlsRow extends StatelessWidget {
                 ),
                 if (onFullScreen != null)
                   IconButton(
-                    tooltip: 'Full screen',
+                    tooltip: fullScreenTooltip,
                     color: Colors.white,
                     onPressed: onFullScreen,
                     icon: Icon(fullScreenIcon),
