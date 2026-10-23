@@ -391,23 +391,28 @@ class _VideoViewerState extends State<_VideoViewer> {
             fit: StackFit.expand,
             children: [
               ColoredBox(color: Colors.black, child: VideoPlayer(_controller)),
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _interactAndTogglePlayback,
+                ),
+              ),
               Center(
                 child: IgnorePointer(
+                  ignoring: !_controlsVisible,
                   child: AnimatedOpacity(
                     opacity: _controlsVisible ? 1 : 0,
                     duration: const Duration(milliseconds: 250),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.55),
-                        shape: BoxShape.circle,
+                    child: IconButton.filled(
+                      iconSize: 34,
+                      tooltip: value.isPlaying ? 'Pause' : 'Play',
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.black.withValues(alpha: 0.55),
+                        foregroundColor: Colors.white,
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Icon(
-                          value.isPlaying ? Icons.pause : Icons.play_arrow,
-                          color: Colors.white,
-                          size: 34,
-                        ),
+                      onPressed: _interactAndTogglePlayback,
+                      icon: Icon(
+                        value.isPlaying ? Icons.pause : Icons.play_arrow,
                       ),
                     ),
                   ),
@@ -574,25 +579,30 @@ class _FullScreenVideoState extends State<_FullScreenVideo> {
               ),
             ),
           ),
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _interactAndTogglePlayback,
+            ),
+          ),
           Center(
             child: IgnorePointer(
+              ignoring: !_controlsVisible,
               child: AnimatedOpacity(
                 opacity: _controlsVisible ? 1 : 0,
                 duration: const Duration(milliseconds: 250),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.55),
-                    shape: BoxShape.circle,
+                child: IconButton.filled(
+                  iconSize: 38,
+                  tooltip: _controller.value.isPlaying ? 'Pause' : 'Play',
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.black.withValues(alpha: 0.55),
+                    foregroundColor: Colors.white,
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Icon(
-                      _controller.value.isPlaying
-                          ? Icons.pause
-                          : Icons.play_arrow,
-                      color: Colors.white,
-                      size: 38,
-                    ),
+                  onPressed: _interactAndTogglePlayback,
+                  icon: Icon(
+                    _controller.value.isPlaying
+                        ? Icons.pause
+                        : Icons.play_arrow,
                   ),
                 ),
               ),
@@ -646,6 +656,8 @@ class _FullScreenVideoState extends State<_FullScreenVideo> {
                         onForward:
                             () => _interactAndSeek(const Duration(seconds: 10)),
                         onToggleMute: _interactAndToggleMute,
+                        onFullScreen: () => Navigator.of(context).pop(),
+                        fullScreenIcon: Icons.fullscreen_exit,
                       ),
                     ],
                   ),
@@ -702,6 +714,7 @@ class _VideoControlsRow extends StatelessWidget {
     required this.onForward,
     required this.onToggleMute,
     this.onFullScreen,
+    this.fullScreenIcon = Icons.fullscreen,
   });
 
   final VideoPlayerController controller;
@@ -710,6 +723,7 @@ class _VideoControlsRow extends StatelessWidget {
   final VoidCallback onForward;
   final VoidCallback onToggleMute;
   final VoidCallback? onFullScreen;
+  final IconData fullScreenIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -769,7 +783,7 @@ class _VideoControlsRow extends StatelessWidget {
                     tooltip: 'Full screen',
                     color: Colors.white,
                     onPressed: onFullScreen,
-                    icon: const Icon(Icons.fullscreen),
+                    icon: Icon(fullScreenIcon),
                   ),
               ],
             ),
