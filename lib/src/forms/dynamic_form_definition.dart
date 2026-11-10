@@ -122,6 +122,7 @@ class DynamicFormField {
     this.maximum,
     this.includeInSummary = false,
     this.visibleWhen,
+    this.pageId,
   });
 
   final String id;
@@ -140,6 +141,9 @@ class DynamicFormField {
   final num? maximum;
   final bool includeInSummary;
   final DynamicFieldCondition? visibleWhen;
+
+  /// Optional page override. The section page is used when this is null.
+  final String? pageId;
 
   factory DynamicFormField.fromJson(Map<String, dynamic> json) =>
       DynamicFormField(
@@ -170,6 +174,7 @@ class DynamicFormField {
                   Map<String, dynamic>.from(json['visibleWhen'] as Map),
                 )
                 : null,
+        pageId: json['pageId'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -190,6 +195,32 @@ class DynamicFormField {
     if (maximum != null) 'maximum': maximum,
     'includeInSummary': includeInSummary,
     if (visibleWhen != null) 'visibleWhen': visibleWhen!.toJson(),
+    if (pageId != null) 'pageId': pageId,
+  };
+}
+
+class DynamicFormPage {
+  const DynamicFormPage({
+    required this.id,
+    required this.title,
+    this.description,
+  });
+
+  final String id;
+  final String title;
+  final String? description;
+
+  factory DynamicFormPage.fromJson(Map<String, dynamic> json) =>
+      DynamicFormPage(
+        id: json['id'] as String,
+        title: json['title'] as String,
+        description: json['description'] as String?,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    if (description != null) 'description': description,
   };
 }
 
@@ -199,6 +230,7 @@ class DynamicFormSection {
     required this.title,
     required this.fields,
     this.description,
+    this.pageId,
   });
 
   final String id;
@@ -206,11 +238,15 @@ class DynamicFormSection {
   final String? description;
   final List<DynamicFormField> fields;
 
+  /// Default page for all fields in this section.
+  final String? pageId;
+
   factory DynamicFormSection.fromJson(Map<String, dynamic> json) =>
       DynamicFormSection(
         id: json['id'] as String,
         title: json['title'] as String,
         description: json['description'] as String?,
+        pageId: json['pageId'] as String?,
         fields: (json['fields'] as List<dynamic>? ?? const [])
             .map(
               (field) => DynamicFormField.fromJson(
@@ -224,6 +260,7 @@ class DynamicFormSection {
     'id': id,
     'title': title,
     if (description != null) 'description': description,
+    if (pageId != null) 'pageId': pageId,
     'fields': fields.map((field) => field.toJson()).toList(),
   };
 }
@@ -241,6 +278,7 @@ class DynamicFormDefinition {
     this.confirmBeforeSubmit = false,
     this.enforceRequiredFields = false,
     this.questionIndicator = DynamicQuestionIndicator.numbered,
+    this.pages = const [],
   });
 
   final String id;
@@ -254,6 +292,9 @@ class DynamicFormDefinition {
   final bool enforceRequiredFields;
   final DynamicQuestionIndicator questionIndicator;
   final List<DynamicFormSection> sections;
+
+  /// Optional page layout. Empty keeps the legacy one-section-per-step flow.
+  final List<DynamicFormPage> pages;
 
   factory DynamicFormDefinition.fromJson(
     String id,
@@ -271,6 +312,12 @@ class DynamicFormDefinition {
     questionIndicator: DynamicQuestionIndicator.fromJson(
       json['questionIndicator'],
     ),
+    pages: (json['pages'] as List<dynamic>? ?? const [])
+        .map(
+          (page) =>
+              DynamicFormPage.fromJson(Map<String, dynamic>.from(page as Map)),
+        )
+        .toList(growable: false),
     sections: (json['sections'] as List<dynamic>? ?? const [])
         .map(
           (section) => DynamicFormSection.fromJson(
@@ -281,6 +328,9 @@ class DynamicFormDefinition {
   );
 
   Map<String, dynamic> toJson() => {
+    // Lets Firestore distinguish page-aware editors from legacy clients while
+    // keeping the legacy sections/questions payload intact.
+    'layoutVersion': 2,
     'title': title,
     if (description != null) 'description': description,
     'submitLabel': submitLabel,
@@ -290,6 +340,7 @@ class DynamicFormDefinition {
     'confirmBeforeSubmit': confirmBeforeSubmit,
     'enforceRequiredFields': enforceRequiredFields,
     'questionIndicator': questionIndicator.name,
+    if (pages.isNotEmpty) 'pages': pages.map((page) => page.toJson()).toList(),
     'sections': sections.map((section) => section.toJson()).toList(),
   };
 }

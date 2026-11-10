@@ -9,6 +9,97 @@ import '../widgets/blocking_progress_overlay.dart';
 
 typedef DynamicFormSubmit = Future<void> Function(Map<String, Object?> values);
 
+class _DynamicSectionFragment {
+  const _DynamicSectionFragment({required this.section, required this.fields});
+
+  final DynamicFormSection section;
+  final List<DynamicFormField> fields;
+}
+
+class _DynamicFormPageLayout {
+  const _DynamicFormPageLayout({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.fragments,
+  });
+
+  final String id;
+  final String title;
+  final String? description;
+  final List<_DynamicSectionFragment> fragments;
+
+  Iterable<DynamicFormField> get fields =>
+      fragments.expand((fragment) => fragment.fields);
+}
+
+List<_DynamicFormPageLayout> _buildPageLayout(
+  DynamicFormDefinition definition,
+) {
+  if (definition.pages.isEmpty) {
+    return [
+      for (final section in definition.sections)
+        _DynamicFormPageLayout(
+          id: section.id,
+          title: section.title,
+          description: section.description,
+          fragments: [
+            _DynamicSectionFragment(section: section, fields: section.fields),
+          ],
+        ),
+    ];
+  }
+
+  final validPageIds = definition.pages.map((page) => page.id).toSet();
+  final result = <_DynamicFormPageLayout>[];
+  for (final page in definition.pages) {
+    final fragments = <_DynamicSectionFragment>[];
+    for (final section in definition.sections) {
+      final fields = section.fields
+          .where((field) => (field.pageId ?? section.pageId) == page.id)
+          .toList(growable: false);
+      if (fields.isNotEmpty) {
+        fragments.add(
+          _DynamicSectionFragment(section: section, fields: fields),
+        );
+      }
+    }
+    if (fragments.isNotEmpty) {
+      result.add(
+        _DynamicFormPageLayout(
+          id: page.id,
+          title: page.title,
+          description: page.description,
+          fragments: fragments,
+        ),
+      );
+    }
+  }
+
+  // Keep unassigned or stale assignments visible instead of losing questions.
+  for (final section in definition.sections) {
+    final fields = section.fields
+        .where((field) {
+          final pageId = field.pageId ?? section.pageId;
+          return pageId == null || !validPageIds.contains(pageId);
+        })
+        .toList(growable: false);
+    if (fields.isNotEmpty) {
+      result.add(
+        _DynamicFormPageLayout(
+          id: 'legacy_${section.id}',
+          title: section.title,
+          description: section.description,
+          fragments: [
+            _DynamicSectionFragment(section: section, fields: fields),
+          ],
+        ),
+      );
+    }
+  }
+  return result;
+}
+
 class DynamicFormView extends StatefulWidget {
   const DynamicFormView({
     required this.definition,
@@ -43,7 +134,10 @@ class _DynamicFormViewState extends State<DynamicFormView> {
   String? _error;
   final _requiredErrors = <String>{};
 
-  DynamicFormSection get _section => widget.definition.sections[_sectionIndex];
+  List<_DynamicFormPageLayout> get _pages =>
+      _buildPageLayout(widget.definition);
+
+  _DynamicFormPageLayout get _page => _pages[_sectionIndex];
 
   @override
   void initState() {
@@ -85,7 +179,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
 
   void _continue() {
     _syncControllerValues();
-    if (!_validateRequiredFields([_section])) return;
+    if (!_validateRequiredFields(_page.fields)) return;
     _showSection(_sectionIndex + 1);
   }
 
@@ -103,7 +197,11 @@ class _DynamicFormViewState extends State<DynamicFormView> {
 
   Future<void> _submit() async {
     _syncControllerValues();
-    if (!_validateRequiredFields(widget.definition.sections)) return;
+    if (!_validateRequiredFields(
+      widget.definition.sections.expand((section) => section.fields),
+    )) {
+      return;
+    }
     setState(() {
       _submitting = true;
       _error = null;
@@ -122,7 +220,11 @@ class _DynamicFormViewState extends State<DynamicFormView> {
 
   Future<void> _reviewAndSubmit() async {
     _syncControllerValues();
-    if (!_validateRequiredFields(widget.definition.sections)) return;
+    if (!_validateRequiredFields(
+      widget.definition.sections.expand((section) => section.fields),
+    )) {
+      return;
+    }
     final confirmed = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder:
@@ -137,19 +239,52 @@ class _DynamicFormViewState extends State<DynamicFormView> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.definition.sections.isEmpty) {
+    final pages = _pages;
+    if (pages.isEmpty) {
       return const Center(child: Text('This form has no sections.'));
     }
-    final isLast = _sectionIndex == widget.definition.sections.length - 1;
-    final visibleFields = _section.fields.where(_isVisible).toList();
+    final pageIndex = _sectionIndex.clamp(0, pages.length - 1);
+    final page = pages[pageIndex];
+    final isLast = pageIndex == pages.length - 1;
     final questionOffset =
-        widget.definition.sections
-            .take(_sectionIndex)
-            .expand((section) => section.fields)
+        pages
+            .take(pageIndex)
+            .expand((page) => page.fields)
             .where(_isVisible)
             .where((field) => field.type != DynamicFieldType.info)
             .length;
     var questionIndex = questionOffset;
+    final questionWidgets = <Widget>[];
+    for (final fragment in page.fragments) {
+      final visibleFields = fragment.fields.where(_isVisible).toList();
+      if (visibleFields.isEmpty) continue;
+      if (widget.definition.pages.isNotEmpty) {
+        questionWidgets
+          ..add(
+            Text(
+              fragment.section.title,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+          )
+          ..add(const SizedBox(height: 6));
+        if (fragment.section.description case final description?) {
+          questionWidgets
+            ..add(Text(description))
+            ..add(const SizedBox(height: 12));
+        }
+      }
+      for (final field in visibleFields) {
+        questionWidgets
+          ..add(
+            _buildQuestion(
+              context,
+              field,
+              field.type == DynamicFieldType.info ? null : ++questionIndex,
+            ),
+          )
+          ..add(const SizedBox(height: 16));
+      }
+    }
     return BlockingProgressOverlay(
       visible: _submitting || _uploading,
       message: _uploading ? 'Uploading file…' : 'Submitting form…',
@@ -157,17 +292,15 @@ class _DynamicFormViewState extends State<DynamicFormView> {
         controller: _scrollController,
         padding: const EdgeInsets.all(20),
         children: [
-          if (widget.definition.sections.length > 1) ...[
-            LinearProgressIndicator(
-              value: (_sectionIndex + 1) / widget.definition.sections.length,
-            ),
+          if (pages.length > 1) ...[
+            LinearProgressIndicator(value: (pageIndex + 1) / pages.length),
             const SizedBox(height: 12),
             Text(
-              'Step ${_sectionIndex + 1} of ${widget.definition.sections.length}',
+              'Step ${pageIndex + 1} of ${pages.length}',
               style: Theme.of(context).textTheme.labelLarge,
             ),
           ],
-          if (widget.showSectionHeader) ...[
+          if (widget.showSectionHeader && widget.definition.pages.isEmpty) ...[
             const SizedBox(height: 12),
             Container(
               width: double.infinity,
@@ -180,11 +313,11 @@ class _DynamicFormViewState extends State<DynamicFormView> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _section.title,
+                    page.title,
                     softWrap: true,
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
-                  if (_section.description case final description?) ...[
+                  if (page.description case final description?) ...[
                     const SizedBox(height: 8),
                     Text(description),
                   ],
@@ -195,14 +328,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
             const Divider(),
           ],
           const SizedBox(height: 20),
-          for (final field in visibleFields) ...[
-            _buildQuestion(
-              context,
-              field,
-              field.type == DynamicFieldType.info ? null : ++questionIndex,
-            ),
-            const SizedBox(height: 16),
-          ],
+          ...questionWidgets,
           if (_error case final error?) ...[
             Text(
               error,
@@ -288,10 +414,10 @@ class _DynamicFormViewState extends State<DynamicFormView> {
     });
   }
 
-  bool _validateRequiredFields(Iterable<DynamicFormSection> sections) {
+  bool _validateRequiredFields(Iterable<DynamicFormField> fields) {
     if (!widget.definition.enforceRequiredFields) return true;
     final missing = <String>{};
-    for (final field in sections.expand((section) => section.fields)) {
+    for (final field in fields) {
       if (!field.required ||
           field.type == DynamicFieldType.info ||
           field.type == DynamicFieldType.privacy) {

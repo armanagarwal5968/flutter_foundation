@@ -49,6 +49,114 @@ void main() {
     expect(parsed.enforceRequiredFields, isFalse);
   });
 
+  test('page layout round-trips without changing section and field IDs', () {
+    const paged = DynamicFormDefinition(
+      id: 'paged',
+      title: 'Paged form',
+      pages: [
+        DynamicFormPage(id: 'page_1', title: 'First page'),
+        DynamicFormPage(id: 'page_2', title: 'Second page'),
+      ],
+      sections: [
+        DynamicFormSection(
+          id: 'section',
+          title: 'A split section',
+          pageId: 'page_1',
+          fields: [
+            DynamicFormField(
+              id: 'first',
+              label: 'First question',
+              type: DynamicFieldType.text,
+            ),
+            DynamicFormField(
+              id: 'second',
+              label: 'Second question',
+              type: DynamicFieldType.text,
+              pageId: 'page_2',
+            ),
+          ],
+        ),
+      ],
+    );
+
+    final parsed = DynamicFormDefinition.fromJson(paged.id, paged.toJson());
+    expect(paged.toJson()['layoutVersion'], 2);
+    expect(parsed.pages.map((page) => page.id), ['page_1', 'page_2']);
+    expect(parsed.sections.single.id, 'section');
+    expect(parsed.sections.single.pageId, 'page_1');
+    expect(parsed.sections.single.fields.map((field) => field.id), [
+      'first',
+      'second',
+    ]);
+    expect(parsed.sections.single.fields.last.pageId, 'page_2');
+  });
+
+  testWidgets('one page can contain sections and a section can span pages', (
+    tester,
+  ) async {
+    const paged = DynamicFormDefinition(
+      id: 'paged_view',
+      title: 'Paged form',
+      pages: [
+        DynamicFormPage(id: 'page_1', title: 'Questions 1–2'),
+        DynamicFormPage(id: 'page_2', title: 'Question 3'),
+      ],
+      sections: [
+        DynamicFormSection(
+          id: 'first_section',
+          title: 'First section',
+          pageId: 'page_1',
+          fields: [
+            DynamicFormField(
+              id: 'first',
+              label: 'First question',
+              type: DynamicFieldType.text,
+            ),
+            DynamicFormField(
+              id: 'third',
+              label: 'Third question',
+              type: DynamicFieldType.text,
+              pageId: 'page_2',
+            ),
+          ],
+        ),
+        DynamicFormSection(
+          id: 'second_section',
+          title: 'Second section',
+          pageId: 'page_1',
+          fields: [
+            DynamicFormField(
+              id: 'second',
+              label: 'Second question',
+              type: DynamicFieldType.text,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DynamicFormView(definition: paged, onSubmit: (_) async {}),
+        ),
+      ),
+    );
+
+    expect(find.text('Questions 1–2'), findsNothing);
+    expect(find.text('First section'), findsOneWidget);
+    expect(find.text('Second section'), findsOneWidget);
+    expect(find.text('First question'), findsOneWidget);
+    expect(find.text('Second question'), findsOneWidget);
+    expect(find.text('Third question'), findsNothing);
+
+    await tester.tap(find.text('Continue'));
+    await tester.pump();
+    expect(find.text('Question 3'), findsNothing);
+    expect(find.text('Third question'), findsOneWidget);
+    expect(find.text('First question'), findsNothing);
+  });
+
   testWidgets('conditional follow-up appears only for the matching answer', (
     tester,
   ) async {
@@ -1021,8 +1129,17 @@ void main() {
       ),
     );
 
-    await tester.ensureVisible(find.text('First section'));
-    await tester.tap(find.text('First section'));
+    final firstSectionMenu = find.byKey(const Key('section-menu-first'));
+    await tester.scrollUntilVisible(
+      firstSectionMenu,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(
+      find
+          .ancestor(of: firstSectionMenu, matching: find.byType(ExpansionTile))
+          .first,
+    );
     await tester.pumpAndSettle();
     final secondFieldMenu = find.byKey(
       const Key('field-menu-first-second_field'),
@@ -1030,14 +1147,13 @@ void main() {
     await tester.ensureVisible(secondFieldMenu);
     await tester.tap(secondFieldMenu);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Move field up'));
+    await tester.tap(find.text('Move question up'));
     await tester.pumpAndSettle();
 
-    final firstSectionMenu = find.byKey(const Key('section-menu-first'));
     await tester.ensureVisible(firstSectionMenu);
     await tester.tap(firstSectionMenu);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Edit section title'));
+    await tester.tap(find.text('Edit or move section'));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('section-title-editor')),
@@ -1046,8 +1162,17 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Save'));
     await tester.pumpAndSettle();
 
+    final secondPage = find.byKey(const Key('page-page_second'));
+    await tester.scrollUntilVisible(
+      secondPage,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(secondPage);
+    await tester.pumpAndSettle();
     final secondSectionMenu = find.byKey(const Key('section-menu-second'));
-    await tester.ensureVisible(secondSectionMenu);
+    await tester.drag(find.byType(ListView).first, const Offset(0, -300));
+    await tester.pumpAndSettle();
     await tester.tap(secondSectionMenu);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Move section up'));
@@ -1063,6 +1188,9 @@ void main() {
       'second_field',
       'first_field',
     ]);
+    expect(saved.pages.map((page) => page.id), ['page_first', 'page_second']);
+    expect(saved.sections.first.pageId, 'page_second');
+    expect(saved.sections.last.pageId, 'page_first');
   });
 
   testWidgets('privacy field uses inline links without a separate action', (

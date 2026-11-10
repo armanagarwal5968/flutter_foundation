@@ -24,6 +24,7 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
   late final TextEditingController _title;
   late final TextEditingController _description;
   late final TextEditingController _submitLabel;
+  late List<DynamicFormPage> _pages;
   late List<DynamicFormSection> _sections;
   late bool _published;
   late bool _catalogVisible;
@@ -38,7 +39,29 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
     _title = TextEditingController(text: widget.form.title);
     _description = TextEditingController(text: widget.form.description);
     _submitLabel = TextEditingController(text: widget.form.submitLabel);
-    _sections = List.of(widget.form.sections);
+    if (widget.form.pages.isEmpty) {
+      _pages = [
+        for (final section in widget.form.sections)
+          DynamicFormPage(
+            id: 'page_${section.id}',
+            title: section.title,
+            description: section.description,
+          ),
+      ];
+      _sections = [
+        for (final section in widget.form.sections)
+          DynamicFormSection(
+            id: section.id,
+            title: section.title,
+            description: section.description,
+            pageId: 'page_${section.id}',
+            fields: section.fields,
+          ),
+      ];
+    } else {
+      _pages = List.of(widget.form.pages);
+      _sections = List.of(widget.form.sections);
+    }
     _published = widget.form.published;
     _catalogVisible = widget.form.catalogVisible;
     _confirmBeforeSubmit = widget.form.confirmBeforeSubmit;
@@ -79,8 +102,108 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
         confirmBeforeSubmit: _confirmBeforeSubmit,
         enforceRequiredFields: _enforceRequiredFields,
         questionIndicator: _questionIndicator,
+        pages: _pages,
         sections: _sections,
       );
+
+  Future<void> _addPage() async {
+    final page = await _pageDialog();
+    if (page != null) setState(() => _pages.add(page));
+  }
+
+  Future<void> _editPage(int pageIndex) async {
+    final page = await _pageDialog(_pages[pageIndex]);
+    if (page != null) setState(() => _pages[pageIndex] = page);
+  }
+
+  void _movePage(int pageIndex, int offset) {
+    final destination = pageIndex + offset;
+    if (destination < 0 || destination >= _pages.length) return;
+    setState(() {
+      final page = _pages.removeAt(pageIndex);
+      _pages.insert(destination, page);
+    });
+  }
+
+  void _deletePage(int pageIndex) {
+    if (_pages.length <= 1) return;
+    final pageId = _pages[pageIndex].id;
+    final destinationId = _pages.firstWhere((page) => page.id != pageId).id;
+    setState(() {
+      _pages.removeAt(pageIndex);
+      _sections = [
+        for (final section in _sections)
+          DynamicFormSection(
+            id: section.id,
+            title: section.title,
+            description: section.description,
+            pageId: section.pageId == pageId ? destinationId : section.pageId,
+            fields: [
+              for (final field in section.fields)
+                _copyField(
+                  field,
+                  pageId: field.pageId == pageId ? destinationId : field.pageId,
+                ),
+            ],
+          ),
+      ];
+    });
+  }
+
+  Future<DynamicFormPage?> _pageDialog([DynamicFormPage? existing]) async {
+    final title = TextEditingController(text: existing?.title);
+    final description = TextEditingController(text: existing?.description);
+    final result = await showDialog<DynamicFormPage>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text(existing == null ? 'Add page' : 'Edit page'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: title,
+                  decoration: const InputDecoration(labelText: 'Page title'),
+                ),
+                TextField(
+                  controller: description,
+                  decoration: const InputDecoration(
+                    labelText: 'Description (optional)',
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  if (title.text.trim().isEmpty) return;
+                  Navigator.pop(
+                    context,
+                    DynamicFormPage(
+                      id:
+                          existing?.id ??
+                          'page_${DateTime.now().microsecondsSinceEpoch}',
+                      title: title.text.trim(),
+                      description:
+                          description.text.trim().isEmpty
+                              ? null
+                              : description.text.trim(),
+                    ),
+                  );
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          ),
+    );
+    title.dispose();
+    description.dispose();
+    return result;
+  }
 
   void _preview() {
     Navigator.of(context).push(
@@ -93,13 +216,13 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
     );
   }
 
-  Future<void> _addSection() async {
-    final section = await _sectionDialog();
+  Future<void> _addSection(String pageId) async {
+    final section = await _sectionDialog(initialPageId: pageId);
     if (section != null) setState(() => _sections.add(section));
   }
 
   Future<void> _editSection(int sectionIndex) async {
-    final section = await _sectionDialog(_sections[sectionIndex]);
+    final section = await _sectionDialog(existing: _sections[sectionIndex]);
     if (section != null) {
       setState(() => _sections[sectionIndex] = section);
     }
@@ -131,16 +254,19 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
             id: section.id,
             title: section.title,
             description: section.description,
+            pageId: section.pageId,
             fields: fields,
           ),
     );
   }
 
-  Future<DynamicFormSection?> _sectionDialog([
+  Future<DynamicFormSection?> _sectionDialog({
     DynamicFormSection? existing,
-  ]) async {
+    String? initialPageId,
+  }) async {
     final title = TextEditingController(text: existing?.title);
     final description = TextEditingController(text: existing?.description);
+    var pageId = existing == null ? initialPageId : existing.pageId;
     final result = await showDialog<DynamicFormSection>(
       context: context,
       builder:
@@ -154,6 +280,25 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
                   controller: title,
                   decoration: const InputDecoration(labelText: 'Title'),
                 ),
+                if (_pages.isNotEmpty)
+                  DropdownButtonFormField<String>(
+                    value: pageId ?? '__unassigned__',
+                    decoration: const InputDecoration(labelText: 'Page'),
+                    items: [
+                      const DropdownMenuItem(
+                        value: '__unassigned__',
+                        child: Text('Unassigned (legacy page)'),
+                      ),
+                      for (final page in _pages)
+                        DropdownMenuItem(
+                          value: page.id,
+                          child: Text(page.title),
+                        ),
+                    ],
+                    onChanged:
+                        (value) =>
+                            pageId = value == '__unassigned__' ? null : value,
+                  ),
                 TextField(
                   controller: description,
                   decoration: const InputDecoration(labelText: 'Description'),
@@ -178,6 +323,7 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
                             description.text.trim().isEmpty
                                 ? null
                                 : description.text.trim(),
+                        pageId: pageId,
                         fields: existing?.fields ?? const [],
                       ),
                     ),
@@ -192,7 +338,10 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
     return result;
   }
 
-  Future<DynamicFormField?> _fieldDialog([DynamicFormField? existing]) async {
+  Future<DynamicFormField?> _fieldDialog({
+    DynamicFormField? existing,
+    String? initialPageId,
+  }) async {
     final label = TextEditingController(text: existing?.label);
     final description = TextEditingController(text: existing?.description);
     final linkLabel = TextEditingController(text: existing?.linkLabel);
@@ -235,6 +384,7 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
     var type = existing?.type ?? DynamicFieldType.text;
     var required = existing?.required ?? false;
     var includeInSummary = existing?.includeInSummary ?? false;
+    var pageId = existing == null ? initialPageId : existing.pageId;
     final result = await showDialog<DynamicFormField>(
       context: context,
       builder:
@@ -250,6 +400,32 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
                           controller: label,
                           decoration: const InputDecoration(labelText: 'Label'),
                         ),
+                        if (_pages.isNotEmpty)
+                          DropdownButtonFormField<String>(
+                            value: pageId ?? '__section__',
+                            decoration: const InputDecoration(
+                              labelText: 'Page placement',
+                              helperText:
+                                  'Choose another page to split this section.',
+                            ),
+                            items: [
+                              const DropdownMenuItem(
+                                value: '__section__',
+                                child: Text('Use section page'),
+                              ),
+                              for (final page in _pages)
+                                DropdownMenuItem(
+                                  value: page.id,
+                                  child: Text(page.title),
+                                ),
+                            ],
+                            onChanged:
+                                (value) => setDialogState(
+                                  () =>
+                                      pageId =
+                                          value == '__section__' ? null : value,
+                                ),
+                          ),
                         DropdownButtonFormField<DynamicFieldType>(
                           value: type,
                           decoration: const InputDecoration(labelText: 'Type'),
@@ -640,6 +816,7 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
                                         value: conditionValue,
                                       )
                                       : null,
+                              pageId: pageId,
                               options: optionRows
                                   .where(
                                     (row) => row.label.text.trim().isNotEmpty,
@@ -677,6 +854,171 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
     return null;
   }
 
+  DynamicFormField _copyField(
+    DynamicFormField field, {
+    required String? pageId,
+  }) => DynamicFormField(
+    id: field.id,
+    label: field.label,
+    type: field.type,
+    description: field.description,
+    linkLabel: field.linkLabel,
+    linkUrl: field.linkUrl,
+    secondaryLinkLabel: field.secondaryLinkLabel,
+    secondaryLinkUrl: field.secondaryLinkUrl,
+    confirmationText: field.confirmationText,
+    placeholder: field.placeholder,
+    required: field.required,
+    options: field.options,
+    minimum: field.minimum,
+    maximum: field.maximum,
+    includeInSummary: field.includeInSummary,
+    visibleWhen: field.visibleWhen,
+    pageId: pageId,
+  );
+
+  Widget _sectionCardForPage({
+    required DynamicFormPage page,
+    required int sectionIndex,
+  }) {
+    final section = _sections[sectionIndex];
+    final fieldIndexes = <int>[
+      for (var index = 0; index < section.fields.length; index++)
+        if ((section.fields[index].pageId ?? section.pageId) == page.id) index,
+    ];
+    final isDefaultPage = section.pageId == page.id;
+    if (!isDefaultPage && fieldIndexes.isEmpty) return const SizedBox.shrink();
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: ExpansionTile(
+        title: Text(section.title),
+        subtitle: Text(
+          '${fieldIndexes.length} question${fieldIndexes.length == 1 ? '' : 's'}'
+          '${isDefaultPage ? '' : ' • split from another page'}',
+        ),
+        trailing: PopupMenuButton<_EditorItemAction>(
+          key: ValueKey(
+            isDefaultPage
+                ? 'section-menu-${section.id}'
+                : 'section-menu-${section.id}-${page.id}',
+          ),
+          tooltip: 'Section actions',
+          onSelected: (action) {
+            switch (action) {
+              case _EditorItemAction.moveUp:
+                _moveSection(sectionIndex, -1);
+              case _EditorItemAction.moveDown:
+                _moveSection(sectionIndex, 1);
+              case _EditorItemAction.edit:
+                _editSection(sectionIndex);
+              case _EditorItemAction.delete:
+                setState(() => _sections.removeAt(sectionIndex));
+            }
+          },
+          itemBuilder:
+              (context) => [
+                PopupMenuItem(
+                  value: _EditorItemAction.moveUp,
+                  enabled: sectionIndex > 0,
+                  child: const Text('Move section up'),
+                ),
+                PopupMenuItem(
+                  value: _EditorItemAction.moveDown,
+                  enabled: sectionIndex < _sections.length - 1,
+                  child: const Text('Move section down'),
+                ),
+                const PopupMenuItem(
+                  value: _EditorItemAction.edit,
+                  child: Text('Edit or move section'),
+                ),
+                const PopupMenuItem(
+                  value: _EditorItemAction.delete,
+                  child: Text('Delete section'),
+                ),
+              ],
+        ),
+        children: [
+          for (final fieldIndex in fieldIndexes)
+            ListTile(
+              title: Text(section.fields[fieldIndex].label),
+              subtitle: Text(
+                '${section.fields[fieldIndex].type.name}'
+                '${section.fields[fieldIndex].visibleWhen == null ? '' : ' • conditional'}'
+                '${section.fields[fieldIndex].pageId == null ? '' : ' • page override'}',
+              ),
+              onTap: () async {
+                final updated = await _fieldDialog(
+                  existing: section.fields[fieldIndex],
+                );
+                if (updated == null) return;
+                final fields = List<DynamicFormField>.of(section.fields)
+                  ..[fieldIndex] = updated;
+                _replaceSectionFields(sectionIndex, fields);
+              },
+              trailing: PopupMenuButton<_EditorItemAction>(
+                key: ValueKey(
+                  'field-menu-${section.id}-${section.fields[fieldIndex].id}',
+                ),
+                tooltip: 'Question actions',
+                onSelected: (action) async {
+                  switch (action) {
+                    case _EditorItemAction.moveUp:
+                      _moveField(sectionIndex, fieldIndex, -1);
+                    case _EditorItemAction.moveDown:
+                      _moveField(sectionIndex, fieldIndex, 1);
+                    case _EditorItemAction.edit:
+                      final updated = await _fieldDialog(
+                        existing: section.fields[fieldIndex],
+                      );
+                      if (updated == null) return;
+                      final fields = List<DynamicFormField>.of(section.fields)
+                        ..[fieldIndex] = updated;
+                      _replaceSectionFields(sectionIndex, fields);
+                    case _EditorItemAction.delete:
+                      final fields = List<DynamicFormField>.of(section.fields)
+                        ..removeAt(fieldIndex);
+                      _replaceSectionFields(sectionIndex, fields);
+                  }
+                },
+                itemBuilder:
+                    (context) => [
+                      PopupMenuItem(
+                        value: _EditorItemAction.moveUp,
+                        enabled: fieldIndex > 0,
+                        child: const Text('Move question up'),
+                      ),
+                      PopupMenuItem(
+                        value: _EditorItemAction.moveDown,
+                        enabled: fieldIndex < section.fields.length - 1,
+                        child: const Text('Move question down'),
+                      ),
+                      const PopupMenuItem(
+                        value: _EditorItemAction.edit,
+                        child: Text('Edit or move question'),
+                      ),
+                      const PopupMenuItem(
+                        value: _EditorItemAction.delete,
+                        child: Text('Delete question'),
+                      ),
+                    ],
+              ),
+            ),
+          ListTile(
+            leading: const Icon(Icons.add),
+            title: const Text('Add question to this section'),
+            onTap: () async {
+              final field = await _fieldDialog(
+                initialPageId: isDefaultPage ? null : page.id,
+              );
+              if (field == null) return;
+              _replaceSectionFields(sectionIndex, [...section.fields, field]);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -695,6 +1037,7 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
         ],
       ),
       body: ListView(
+        cacheExtent: 1200,
         padding: const EdgeInsets.all(16),
         children: [
           TextField(
@@ -763,159 +1106,254 @@ class _DynamicFormEditorPageState extends State<DynamicFormEditorPage> {
             ),
           ),
           const Divider(),
-          for (
-            var sectionIndex = 0;
-            sectionIndex < _sections.length;
-            sectionIndex++
-          )
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Pages',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: _addPage,
+                icon: const Icon(Icons.add),
+                label: const Text('Add page'),
+              ),
+            ],
+          ),
+          if (_pages.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'No pages configured. The form uses one section per step for compatibility.',
+              ),
+            ),
+          for (var pageIndex = 0; pageIndex < _pages.length; pageIndex++)
             Card(
               child: ExpansionTile(
-                title: Text(_sections[sectionIndex].title),
+                key: ValueKey('page-${_pages[pageIndex].id}'),
+                initiallyExpanded: pageIndex == 0,
+                leading: CircleAvatar(child: Text('${pageIndex + 1}')),
+                title: Text(_pages[pageIndex].title),
                 subtitle: Text(
-                  '${_sections[sectionIndex].fields.length} fields',
+                  _pages[pageIndex].description ??
+                      '${_sections.where((section) => section.pageId == _pages[pageIndex].id || section.fields.any((field) => field.pageId == _pages[pageIndex].id)).length} section(s)',
                 ),
                 trailing: PopupMenuButton<_EditorItemAction>(
-                  key: ValueKey('section-menu-${_sections[sectionIndex].id}'),
-                  tooltip: 'Section actions',
+                  tooltip: 'Page actions',
                   onSelected: (action) {
                     switch (action) {
                       case _EditorItemAction.moveUp:
-                        _moveSection(sectionIndex, -1);
+                        _movePage(pageIndex, -1);
                       case _EditorItemAction.moveDown:
-                        _moveSection(sectionIndex, 1);
+                        _movePage(pageIndex, 1);
                       case _EditorItemAction.edit:
-                        _editSection(sectionIndex);
+                        _editPage(pageIndex);
                       case _EditorItemAction.delete:
-                        setState(() => _sections.removeAt(sectionIndex));
+                        _deletePage(pageIndex);
                     }
                   },
                   itemBuilder:
                       (context) => [
                         PopupMenuItem(
                           value: _EditorItemAction.moveUp,
-                          enabled: sectionIndex > 0,
-                          child: const Text('Move section up'),
+                          enabled: pageIndex > 0,
+                          child: const Text('Move page up'),
                         ),
                         PopupMenuItem(
                           value: _EditorItemAction.moveDown,
-                          enabled: sectionIndex < _sections.length - 1,
-                          child: const Text('Move section down'),
+                          enabled: pageIndex < _pages.length - 1,
+                          child: const Text('Move page down'),
                         ),
                         const PopupMenuItem(
                           value: _EditorItemAction.edit,
-                          child: Text('Edit section title'),
+                          child: Text('Edit page'),
                         ),
                         const PopupMenuItem(
                           value: _EditorItemAction.delete,
-                          child: Text('Delete section'),
+                          child: Text('Delete and merge into another page'),
                         ),
                       ],
                 ),
                 children: [
                   for (
-                    var fieldIndex = 0;
-                    fieldIndex < _sections[sectionIndex].fields.length;
-                    fieldIndex++
+                    var sectionIndex = 0;
+                    sectionIndex < _sections.length;
+                    sectionIndex++
                   )
-                    ListTile(
-                      title: Text(
-                        _sections[sectionIndex].fields[fieldIndex].label,
-                      ),
-                      subtitle: Text(
-                        '${_sections[sectionIndex].fields[fieldIndex].type.name}'
-                        '${_sections[sectionIndex].fields[fieldIndex].visibleWhen == null ? '' : ' • conditional'}',
-                      ),
-                      onTap: () async {
-                        final updated = await _fieldDialog(
-                          _sections[sectionIndex].fields[fieldIndex],
-                        );
-                        if (updated == null) return;
-                        final fields = List<DynamicFormField>.of(
-                          _sections[sectionIndex].fields,
-                        )..[fieldIndex] = updated;
-                        setState(
-                          () =>
-                              _sections[sectionIndex] = DynamicFormSection(
-                                id: _sections[sectionIndex].id,
-                                title: _sections[sectionIndex].title,
-                                description:
-                                    _sections[sectionIndex].description,
-                                fields: fields,
-                              ),
-                        );
-                      },
-                      trailing: PopupMenuButton<_EditorItemAction>(
-                        key: ValueKey(
-                          'field-menu-${_sections[sectionIndex].id}-${_sections[sectionIndex].fields[fieldIndex].id}',
-                        ),
-                        tooltip: 'Field actions',
-                        onSelected: (action) async {
-                          switch (action) {
-                            case _EditorItemAction.moveUp:
-                              _moveField(sectionIndex, fieldIndex, -1);
-                            case _EditorItemAction.moveDown:
-                              _moveField(sectionIndex, fieldIndex, 1);
-                            case _EditorItemAction.edit:
-                              final updated = await _fieldDialog(
-                                _sections[sectionIndex].fields[fieldIndex],
-                              );
-                              if (updated == null) return;
-                              final fields = List<DynamicFormField>.of(
-                                _sections[sectionIndex].fields,
-                              )..[fieldIndex] = updated;
-                              _replaceSectionFields(sectionIndex, fields);
-                            case _EditorItemAction.delete:
-                              final fields = List<DynamicFormField>.of(
-                                _sections[sectionIndex].fields,
-                              )..removeAt(fieldIndex);
-                              _replaceSectionFields(sectionIndex, fields);
-                          }
-                        },
-                        itemBuilder:
-                            (context) => [
-                              PopupMenuItem(
-                                value: _EditorItemAction.moveUp,
-                                enabled: fieldIndex > 0,
-                                child: const Text('Move field up'),
-                              ),
-                              PopupMenuItem(
-                                value: _EditorItemAction.moveDown,
-                                enabled:
-                                    fieldIndex <
-                                    _sections[sectionIndex].fields.length - 1,
-                                child: const Text('Move field down'),
-                              ),
-                              const PopupMenuItem(
-                                value: _EditorItemAction.edit,
-                                child: Text('Edit field'),
-                              ),
-                              const PopupMenuItem(
-                                value: _EditorItemAction.delete,
-                                child: Text('Delete field'),
-                              ),
-                            ],
-                      ),
+                    _sectionCardForPage(
+                      page: _pages[pageIndex],
+                      sectionIndex: sectionIndex,
                     ),
                   ListTile(
                     leading: const Icon(Icons.add),
-                    title: const Text('Add field'),
-                    onTap: () async {
-                      final field = await _fieldDialog();
-                      if (field == null) return;
-                      _replaceSectionFields(sectionIndex, [
-                        ..._sections[sectionIndex].fields,
-                        field,
-                      ]);
-                    },
+                    title: const Text('Add section to this page'),
+                    onTap: () => _addSection(_pages[pageIndex].id),
                   ),
                 ],
               ),
             ),
-          OutlinedButton.icon(
-            onPressed: _addSection,
-            icon: const Icon(Icons.add),
-            label: const Text('Add section'),
-          ),
+          if (_pages.isEmpty) ...[
+            const Divider(),
+            Text('Sections', style: Theme.of(context).textTheme.titleLarge),
+            for (
+              var sectionIndex = 0;
+              sectionIndex < _sections.length;
+              sectionIndex++
+            )
+              Card(
+                child: ExpansionTile(
+                  title: Text(_sections[sectionIndex].title),
+                  subtitle: Text(
+                    '${_sections[sectionIndex].fields.length} fields',
+                  ),
+                  trailing: PopupMenuButton<_EditorItemAction>(
+                    key: ValueKey('section-menu-${_sections[sectionIndex].id}'),
+                    tooltip: 'Section actions',
+                    onSelected: (action) {
+                      switch (action) {
+                        case _EditorItemAction.moveUp:
+                          _moveSection(sectionIndex, -1);
+                        case _EditorItemAction.moveDown:
+                          _moveSection(sectionIndex, 1);
+                        case _EditorItemAction.edit:
+                          _editSection(sectionIndex);
+                        case _EditorItemAction.delete:
+                          setState(() => _sections.removeAt(sectionIndex));
+                      }
+                    },
+                    itemBuilder:
+                        (context) => [
+                          PopupMenuItem(
+                            value: _EditorItemAction.moveUp,
+                            enabled: sectionIndex > 0,
+                            child: const Text('Move section up'),
+                          ),
+                          PopupMenuItem(
+                            value: _EditorItemAction.moveDown,
+                            enabled: sectionIndex < _sections.length - 1,
+                            child: const Text('Move section down'),
+                          ),
+                          const PopupMenuItem(
+                            value: _EditorItemAction.edit,
+                            child: Text('Edit section title'),
+                          ),
+                          const PopupMenuItem(
+                            value: _EditorItemAction.delete,
+                            child: Text('Delete section'),
+                          ),
+                        ],
+                  ),
+                  children: [
+                    for (
+                      var fieldIndex = 0;
+                      fieldIndex < _sections[sectionIndex].fields.length;
+                      fieldIndex++
+                    )
+                      ListTile(
+                        title: Text(
+                          _sections[sectionIndex].fields[fieldIndex].label,
+                        ),
+                        subtitle: Text(
+                          '${_sections[sectionIndex].fields[fieldIndex].type.name}'
+                          '${_sections[sectionIndex].fields[fieldIndex].visibleWhen == null ? '' : ' • conditional'}',
+                        ),
+                        onTap: () async {
+                          final updated = await _fieldDialog(
+                            existing:
+                                _sections[sectionIndex].fields[fieldIndex],
+                          );
+                          if (updated == null) return;
+                          final fields = List<DynamicFormField>.of(
+                            _sections[sectionIndex].fields,
+                          )..[fieldIndex] = updated;
+                          setState(
+                            () =>
+                                _sections[sectionIndex] = DynamicFormSection(
+                                  id: _sections[sectionIndex].id,
+                                  title: _sections[sectionIndex].title,
+                                  description:
+                                      _sections[sectionIndex].description,
+                                  pageId: _sections[sectionIndex].pageId,
+                                  fields: fields,
+                                ),
+                          );
+                        },
+                        trailing: PopupMenuButton<_EditorItemAction>(
+                          key: ValueKey(
+                            'field-menu-${_sections[sectionIndex].id}-${_sections[sectionIndex].fields[fieldIndex].id}',
+                          ),
+                          tooltip: 'Field actions',
+                          onSelected: (action) async {
+                            switch (action) {
+                              case _EditorItemAction.moveUp:
+                                _moveField(sectionIndex, fieldIndex, -1);
+                              case _EditorItemAction.moveDown:
+                                _moveField(sectionIndex, fieldIndex, 1);
+                              case _EditorItemAction.edit:
+                                final updated = await _fieldDialog(
+                                  existing:
+                                      _sections[sectionIndex]
+                                          .fields[fieldIndex],
+                                );
+                                if (updated == null) return;
+                                final fields = List<DynamicFormField>.of(
+                                  _sections[sectionIndex].fields,
+                                )..[fieldIndex] = updated;
+                                _replaceSectionFields(sectionIndex, fields);
+                              case _EditorItemAction.delete:
+                                final fields = List<DynamicFormField>.of(
+                                  _sections[sectionIndex].fields,
+                                )..removeAt(fieldIndex);
+                                _replaceSectionFields(sectionIndex, fields);
+                            }
+                          },
+                          itemBuilder:
+                              (context) => [
+                                PopupMenuItem(
+                                  value: _EditorItemAction.moveUp,
+                                  enabled: fieldIndex > 0,
+                                  child: const Text('Move field up'),
+                                ),
+                                PopupMenuItem(
+                                  value: _EditorItemAction.moveDown,
+                                  enabled:
+                                      fieldIndex <
+                                      _sections[sectionIndex].fields.length - 1,
+                                  child: const Text('Move field down'),
+                                ),
+                                const PopupMenuItem(
+                                  value: _EditorItemAction.edit,
+                                  child: Text('Edit field'),
+                                ),
+                                const PopupMenuItem(
+                                  value: _EditorItemAction.delete,
+                                  child: Text('Delete field'),
+                                ),
+                              ],
+                        ),
+                      ),
+                    ListTile(
+                      leading: const Icon(Icons.add),
+                      title: const Text('Add field'),
+                      onTap: () async {
+                        final field = await _fieldDialog();
+                        if (field == null) return;
+                        _replaceSectionFields(sectionIndex, [
+                          ..._sections[sectionIndex].fields,
+                          field,
+                        ]);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            OutlinedButton.icon(
+              onPressed: null,
+              icon: const Icon(Icons.add),
+              label: const Text('Add section'),
+            ),
+          ],
         ],
       ),
     );

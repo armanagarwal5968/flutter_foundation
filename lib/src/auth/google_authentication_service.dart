@@ -29,15 +29,18 @@ class FirebaseAuthenticationService
 
   static Future<void>? _nativeInitialization;
   AuthUser? _currentUser;
+  late final Stream<AuthUser?> _sharedAuthStateChanges =
+      _firebaseAuth
+          .idTokenChanges()
+          .asyncMap(_mapUser)
+          .map((user) => _currentUser = user)
+          .asBroadcastStream();
 
   @override
   AuthUser? get currentUser => _currentUser;
 
   @override
-  Stream<AuthUser?> get authStateChanges => _firebaseAuth
-      .idTokenChanges()
-      .asyncMap(_mapUser)
-      .map((user) => _currentUser = user);
+  Stream<AuthUser?> get authStateChanges => _sharedAuthStateChanges;
 
   @override
   Future<void> initialize() async {
