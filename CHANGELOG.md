@@ -1,3 +1,11 @@
+## 0.3.0 - 2026-11-23
+
+* Added form drafts: `DraftableDynamicFormView` saves answers and the current
+  page while a form is filled in, restores them on reopen, and clears them on
+  submit, backed by `FirestoreDynamicFormDraftStore` or any
+  `DynamicFormDraftStore`.
+* `DynamicFormView` gained `onChanged` and `initialPageIndex`.
+
 ## 0.2.0 - 2026-11-23
 
 * Added `PerformanceTiming` for step-by-step operation timing reported to

@@ -106,6 +106,8 @@ class DynamicFormView extends StatefulWidget {
     required this.onSubmit,
     this.onSubmitted,
     this.initialValues = const {},
+    this.initialPageIndex = 0,
+    this.onChanged,
     this.fileUploader,
     this.showSectionHeader = true,
     this.sectionHeaderDecoration,
@@ -116,6 +118,14 @@ class DynamicFormView extends StatefulWidget {
   final DynamicFormSubmit onSubmit;
   final Future<void> Function()? onSubmitted;
   final Map<String, Object?> initialValues;
+
+  /// Page to open on, e.g. where a restored draft left off. Clamped to the
+  /// form's pages.
+  final int initialPageIndex;
+
+  /// Called with the current answers and page whenever an answer changes,
+  /// text is typed, or the page changes. Used to save drafts.
+  final DynamicFormChanged? onChanged;
   final DynamicFormFileUploader? fileUploader;
   final bool showSectionHeader;
   final BoxDecoration? sectionHeaderDecoration;
@@ -123,6 +133,11 @@ class DynamicFormView extends StatefulWidget {
   @override
   State<DynamicFormView> createState() => _DynamicFormViewState();
 }
+
+/// Current answers (including typed text not yet confirmed by Continue) and
+/// the page index being shown.
+typedef DynamicFormChanged =
+    void Function(Map<String, Object?> values, int pageIndex);
 
 class _DynamicFormViewState extends State<DynamicFormView> {
   final _values = <String, Object?>{};
@@ -159,6 +174,48 @@ class _DynamicFormViewState extends State<DynamicFormView> {
       }
     }
     _removeHiddenValues();
+    final pageCount = _pages.length;
+    if (pageCount > 0) {
+      _sectionIndex = widget.initialPageIndex.clamp(0, pageCount - 1);
+    }
+    if (widget.onChanged != null) {
+      for (final controller in _controllers.values) {
+        controller.addListener(_notifyChanged);
+      }
+    }
+  }
+
+  /// Answers as they stand right now, without changing form state.
+  Map<String, Object?> _currentValues() {
+    final values = Map<String, Object?>.of(_values);
+    for (final section in widget.definition.sections) {
+      for (final field in section.fields) {
+        if (_usesController(field.type)) {
+          final text = _controllers[field.id]!.text.trim();
+          if (_isVisible(field) && text.isNotEmpty) {
+            values[field.id] = text;
+          } else {
+            values.remove(field.id);
+          }
+        }
+        if (_hasOtherOption(field)) {
+          final detailsKey = _otherDetailsKey(field);
+          final text = _controllers[detailsKey]!.text.trim();
+          if (text.isNotEmpty) {
+            values[detailsKey] = text;
+          } else {
+            values.remove(detailsKey);
+          }
+        }
+      }
+    }
+    return values;
+  }
+
+  void _notifyChanged() {
+    final onChanged = widget.onChanged;
+    if (onChanged == null || _submitting) return;
+    onChanged(Map.unmodifiable(_currentValues()), _sectionIndex);
   }
 
   @override
@@ -188,6 +245,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
       _error = null;
       _sectionIndex = index;
     });
+    _notifyChanged();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _scrollController.hasClients) {
         _scrollController.jumpTo(0);
@@ -412,6 +470,7 @@ class _DynamicFormViewState extends State<DynamicFormView> {
       _requiredErrors.remove(fieldId);
       _removeHiddenValues();
     });
+    _notifyChanged();
   }
 
   bool _validateRequiredFields(Iterable<DynamicFormField> fields) {
