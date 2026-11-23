@@ -1,3 +1,14 @@
+## 0.2.0 - 2026-11-23
+
+* Added `PerformanceTiming` for step-by-step operation timing reported to
+  Firebase Performance, Analytics (slow or failed operations only), and the
+  debug console, plus `callTimed` for Cloud Functions and `timeFirstEvent` for
+  stream first-load timing.
+* Timed session restore, Google, Apple, and email sign-in steps, dynamic form
+  loads and submission, and session media loads and uploads.
+* Google sign-in on web now always uses the full-page redirect, since desktop
+  popups could open behind the browser window.
+
 ## 0.1.0 - 2026-11-11
 
 * Added backward-compatible form pages that organize existing sections without

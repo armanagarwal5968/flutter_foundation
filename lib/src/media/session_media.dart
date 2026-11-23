@@ -7,6 +7,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../telemetry/performance_timing.dart';
 import 'storage_upload_stub.dart'
     if (dart.library.io) 'storage_upload_io.dart'
     as platform_upload;
@@ -100,6 +101,7 @@ class SessionMediaRepository {
           .where('status', isEqualTo: 'published')
           .orderBy('sortOrder')
           .snapshots()
+          .timeFirstEvent('load_session_media')
           .map(
             (snapshot) =>
                 snapshot.docs.map(SessionMediaAsset.fromDocument).toList(),
@@ -112,6 +114,7 @@ class SessionMediaRepository {
           .collection('media')
           .orderBy('sortOrder')
           .snapshots()
+          .timeFirstEvent('load_session_media_all')
           .map(
             (snapshot) =>
                 snapshot.docs.map(SessionMediaAsset.fromDocument).toList(),
@@ -135,6 +138,7 @@ class SessionMediaRepository {
     return query
         .orderBy('createdAt')
         .snapshots()
+        .timeFirstEvent('load_patient_media')
         .map(
           (snapshot) =>
               snapshot.docs.map(SessionMediaAsset.fromDocument).toList(),
@@ -158,10 +162,17 @@ class SessionMediaRepository {
             .id;
     final picked = await _pick(type);
     if (picked == null) return;
+    final timing = _startUploadTiming('media_upload_standard', type, picked);
     final path = 'standard_session_media/$sessionId/$mediaId/${picked.name}';
-    await _upload(path, picked, onProgress);
     try {
-      await _functions.httpsCallable('registerStandardSessionMedia').call({
+      await _upload(path, picked, onProgress);
+    } on Object {
+      timing.stop(outcome: 'error');
+      rethrow;
+    }
+    timing.step('storage_upload');
+    try {
+      await _functions.callTimed('registerStandardSessionMedia', {
         'sessionId': sessionId,
         'mediaId': mediaId,
         'title': title.trim(),
@@ -173,7 +184,10 @@ class SessionMediaRepository {
         'sizeBytes': picked.size,
         'sortOrder': sortOrder,
       });
+      timing.step('register');
+      timing.stop();
     } catch (_) {
+      timing.stop(outcome: 'error');
       await _storage.ref(path).delete().catchError((_) {});
       rethrow;
     }
@@ -199,11 +213,18 @@ class SessionMediaRepository {
             .id;
     final picked = await _pick(type);
     if (picked == null) return;
+    final timing = _startUploadTiming('media_upload_patient', type, picked);
     final path =
         'patient_session_media/$patientId/$sessionId/$attachmentId/${picked.name}';
-    await _upload(path, picked, onProgress);
     try {
-      await _functions.httpsCallable('registerPatientSessionMedia').call({
+      await _upload(path, picked, onProgress);
+    } on Object {
+      timing.stop(outcome: 'error');
+      rethrow;
+    }
+    timing.step('storage_upload');
+    try {
+      await _functions.callTimed('registerPatientSessionMedia', {
         'patientId': patientId,
         'sessionId': sessionId,
         'attachmentId': attachmentId,
@@ -216,7 +237,10 @@ class SessionMediaRepository {
         'sizeBytes': picked.size,
         'visibleToPatient': visibleToPatient,
       });
+      timing.step('register');
+      timing.stop();
     } catch (_) {
+      timing.stop(outcome: 'error');
       await _storage.ref(path).delete().catchError((_) {});
       rethrow;
     }
@@ -225,7 +249,7 @@ class SessionMediaRepository {
   Future<void> archiveStandardMedia({
     required String sessionId,
     required String mediaId,
-  }) => _functions.httpsCallable('archiveStandardSessionMedia').call({
+  }) => _functions.callTimed('archiveStandardSessionMedia', {
     'sessionId': sessionId,
     'mediaId': mediaId,
   });
@@ -237,7 +261,7 @@ class SessionMediaRepository {
     required int sortOrder,
     String? description,
     bool published = true,
-  }) => _functions.httpsCallable('updateStandardSessionMedia').call({
+  }) => _functions.callTimed('updateStandardSessionMedia', {
     'sessionId': sessionId,
     'mediaId': mediaId,
     'title': title,
@@ -250,18 +274,40 @@ class SessionMediaRepository {
     required String patientId,
     required String sessionId,
     required String attachmentId,
-  }) => _functions.httpsCallable('archivePatientSessionMedia').call({
+  }) => _functions.callTimed('archivePatientSessionMedia', {
     'patientId': patientId,
     'sessionId': sessionId,
     'attachmentId': attachmentId,
   });
 
   Future<String> downloadUrl(SessionMediaAsset asset) async {
-    final result = await _functions.httpsCallable('getSessionMediaUrl').call({
+    final result = await _functions.callTimed('getSessionMediaUrl', {
       'storagePath': asset.storagePath,
     });
     final data = Map<String, dynamic>.from(result.data as Map);
     return data['url'] as String;
+  }
+
+  /// Starts after the file picker closes so time spent choosing a file is
+  /// not counted. Size is bucketed so traces can be compared by file size.
+  TimedOperation _startUploadTiming(
+    String name,
+    SessionMediaType type,
+    PlatformFile file,
+  ) {
+    final megabytes = file.size / (1024 * 1024);
+    final sizeBucket =
+        megabytes < 1
+            ? 'lt_1mb'
+            : megabytes < 10
+            ? '1_10mb'
+            : megabytes < 50
+            ? '10_50mb'
+            : 'gt_50mb';
+    return PerformanceTiming.instance.start(
+      name,
+      attributes: {'media_type': type.name, 'size_bucket': sizeBucket},
+    );
   }
 
   Future<PlatformFile?> _pick(SessionMediaType type) async {

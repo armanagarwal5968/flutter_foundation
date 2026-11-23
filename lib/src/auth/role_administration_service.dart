@@ -1,4 +1,5 @@
 import 'package:cloud_functions/cloud_functions.dart';
+import '../telemetry/performance_timing.dart';
 
 class RoleAssignment {
   const RoleAssignment({
@@ -61,15 +62,15 @@ class FirebaseRoleAdministrationService implements RoleAdministrationService {
 
   @override
   Future<RoleAssignment> findByEmail(String email) async {
-    final result = await _functions.httpsCallable('getUserRoleAssignment').call(
-      {'email': email},
-    );
+    final result = await _functions.callTimed('getUserRoleAssignment', {
+      'email': email,
+    });
     return RoleAssignment.fromJson(_map(result.data));
   }
 
   @override
   Future<List<RoleAssignment>> listAssignments() async {
-    final result = await _functions.httpsCallable('listRoleAssignments').call();
+    final result = await _functions.callTimed('listRoleAssignments');
     final data = _map(result.data);
     final assignments = data['assignments'] as List<dynamic>? ?? const [];
     return assignments
@@ -82,7 +83,7 @@ class FirebaseRoleAdministrationService implements RoleAdministrationService {
     required String email,
     required Set<String> roles,
   }) async {
-    final result = await _functions.httpsCallable('setUserRoles').call({
+    final result = await _functions.callTimed('setUserRoles', {
       'email': email,
       'roles': roles.toList()..sort(),
     });

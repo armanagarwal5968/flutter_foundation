@@ -19,6 +19,7 @@ export 'src/media/session_media.dart';
 export 'src/media/session_resource_viewer.dart';
 export 'src/telemetry/firebase_telemetry.dart';
 export 'src/telemetry/firebase_crash_reporter.dart';
+export 'src/telemetry/performance_timing.dart';
 export 'src/widgets/blocking_progress_overlay.dart';
 
 /// Metadata for the shared foundation package.

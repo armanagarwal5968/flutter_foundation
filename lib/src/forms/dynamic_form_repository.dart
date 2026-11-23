@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import 'dynamic_form_definition.dart';
+import '../telemetry/performance_timing.dart';
 
 abstract interface class DynamicFormRepository {
   Stream<DynamicFormDefinition?> watchForm(String formId);
@@ -37,6 +38,7 @@ class FirestoreDynamicFormRepository implements DynamicFormRepository {
   Stream<DynamicFormDefinition?> watchForm(String formId) => _forms
       .doc(formId)
       .snapshots()
+      .timeFirstEvent('load_form', attributes: {'form_id': formId})
       .map(
         (snapshot) =>
             snapshot.exists
@@ -52,14 +54,22 @@ class FirestoreDynamicFormRepository implements DynamicFormRepository {
           .where('published', isEqualTo: true)
           .where('catalogVisible', isEqualTo: true);
     }
-    return query.snapshots().map(
-      (snapshot) => snapshot.docs
-          .map(
-            (document) =>
-                DynamicFormDefinition.fromJson(document.id, document.data()),
-          )
-          .toList(growable: false),
-    );
+    return query
+        .snapshots()
+        .timeFirstEvent(
+          'load_form_catalog',
+          attributes: {'include_drafts': includeDrafts ? 'yes' : 'no'},
+        )
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (document) => DynamicFormDefinition.fromJson(
+                  document.id,
+                  document.data(),
+                ),
+              )
+              .toList(growable: false),
+        );
   }
 
   @override
@@ -75,12 +85,14 @@ class FirestoreDynamicFormRepository implements DynamicFormRepository {
     required int formVersion,
     required Map<String, Object?> values,
     Map<String, Object?> context = const {},
-  }) async {
-    await _functions.httpsCallable('submitDynamicForm').call({
+  }) => PerformanceTiming.instance.measure(
+    'form_submit',
+    attributes: {'form_id': formId},
+    (_) => _functions.callTimed('submitDynamicForm', {
       'formId': formId,
       'formVersion': formVersion,
       'values': values,
       'context': context,
-    });
-  }
+    }),
+  );
 }

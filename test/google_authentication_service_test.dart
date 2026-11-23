@@ -18,11 +18,18 @@ void main() {
       );
     });
 
-    test('keeps popup on desktop web', () {
-      expect(
-        shouldUseGoogleRedirect(isWeb: true, platform: TargetPlatform.macOS),
-        isFalse,
-      );
+    test('uses redirect on desktop web', () {
+      for (final platform in [
+        TargetPlatform.windows,
+        TargetPlatform.macOS,
+        TargetPlatform.linux,
+      ]) {
+        expect(
+          shouldUseGoogleRedirect(isWeb: true, platform: platform),
+          isTrue,
+          reason: '$platform',
+        );
+      }
     });
 
     test('keeps native flow on iOS apps', () {
